@@ -17,7 +17,16 @@ class PitchDetector {
         this.noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
         // 最小音量阈值（避免检测静音）
-        this.minVolumeThreshold = 0.01;
+        this.minVolumeThreshold = 0.015;
+
+        // 声门检测（区分有声音和静音）
+        this.gateThreshold = 0.02; // 降低声门阈值
+        this.gateHistory = [];
+        this.gateHistorySize = 2; // 降低到2帧，更快响应
+
+        // 八度跳变抑制
+        this.lastValidFrequency = 0;
+        this.maxOctaveJump = 1200; // 最大允许1个八度的跳变（1200 cents）
     }
 
     /**
@@ -62,8 +71,18 @@ class PitchDetector {
             return null;
         }
 
-        // 检查音量阈值
-        if (volume !== null && volume < this.minVolumeThreshold) {
+        // 声门检测 - 需要连续几帧超过阈值才认为是有效声音
+        const isGateOpen = volume >= this.gateThreshold;
+        this.gateHistory.push(isGateOpen);
+        if (this.gateHistory.length > this.gateHistorySize) {
+            this.gateHistory.shift();
+        }
+
+        // 如果声门未打开（静音或音量太小），清空历史并返回
+        const gateOpenCount = this.gateHistory.filter(v => v).length;
+        if (gateOpenCount < Math.ceil(this.gateHistorySize / 2)) {
+            // 声门关闭，清空历史
+            this.pitchHistory = [];
             return null;
         }
 
@@ -71,6 +90,15 @@ class PitchDetector {
         const frequency = this.detector(audioBuffer);
 
         if (frequency && frequency > 0 && frequency < 2000) {
+            // 八度跳变抑制
+            if (this.lastValidFrequency > 0) {
+                const cents = 1200 * Math.log2(frequency / this.lastValidFrequency);
+                if (Math.abs(cents) > this.maxOctaveJump) {
+                    // 跳变过大，忽略此帧
+                    return null;
+                }
+            }
+
             // 添加到历史记录
             this.pitchHistory.push(frequency);
             if (this.pitchHistory.length > this.historySize) {
@@ -79,6 +107,9 @@ class PitchDetector {
 
             // 计算平滑后的频率
             const smoothedFrequency = this.getSmoothedPitch();
+
+            // 更新最后有效频率
+            this.lastValidFrequency = smoothedFrequency;
 
             // 转换为音符信息
             const noteInfo = this.frequencyToNote(smoothedFrequency);
@@ -90,7 +121,8 @@ class PitchDetector {
                 octave: noteInfo.octave,
                 cents: noteInfo.cents,
                 confidence: this.calculateConfidence(audioBuffer, frequency),
-                volume: volume
+                volume: volume,
+                isGateOpen: true // 标记声门已打开
             };
         }
 
@@ -223,6 +255,8 @@ class PitchDetector {
      */
     reset() {
         this.pitchHistory = [];
+        this.gateHistory = [];
+        this.lastValidFrequency = 0;
     }
 
     /**

@@ -32,7 +32,20 @@ class KazooApp {
             pitchCanvas: document.getElementById('pitchCanvas'),
 
             // 乐器按钮
-            instrumentBtns: document.querySelectorAll('.instrument-btn')
+            instrumentBtns: document.querySelectorAll('.instrument-btn'),
+
+            // 高级设置
+            advancedSettings: document.getElementById('advancedSettings'),
+            toggleAdvanced: document.getElementById('toggleAdvanced'),
+            settingsContent: document.getElementById('settingsContent'),
+            confidenceSlider: document.getElementById('confidenceSlider'),
+            confidenceValue: document.getElementById('confidenceValue'),
+            glideSlider: document.getElementById('glideSlider'),
+            glideValue: document.getElementById('glideValue'),
+            releaseSlider: document.getElementById('releaseSlider'),
+            releaseValue: document.getElementById('releaseValue'),
+            noteChangeSlider: document.getElementById('noteChangeSlider'),
+            noteChangeValue: document.getElementById('noteChangeValue')
         };
 
         // 可视化设置
@@ -103,6 +116,41 @@ class KazooApp {
         this.ui.helpToggle.addEventListener('click', () => {
             this.ui.helpContent.classList.toggle('show');
         });
+
+        // 高级设置切换
+        this.ui.toggleAdvanced.addEventListener('click', () => {
+            const isVisible = this.ui.settingsContent.style.display !== 'none';
+            this.ui.settingsContent.style.display = isVisible ? 'none' : 'block';
+            this.ui.toggleAdvanced.textContent = isVisible ? 'Show Settings' : 'Hide Settings';
+        });
+
+        // 灵敏度控制
+        this.ui.confidenceSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            this.ui.confidenceValue.textContent = value.toFixed(2);
+            synthesizerEngine.minConfidence = value;
+        });
+
+        // 滑音时间控制
+        this.ui.glideSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            this.ui.glideValue.textContent = value;
+            synthesizerEngine.glideTime = value / 1000; // 转换为秒
+        });
+
+        // 释放延迟控制
+        this.ui.releaseSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            this.ui.releaseValue.textContent = value;
+            synthesizerEngine.releaseDelay = value;
+        });
+
+        // 音符变化阈值控制
+        this.ui.noteChangeSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            this.ui.noteChangeValue.textContent = value;
+            synthesizerEngine.noteChangeThreshold = value;
+        });
     }
 
     /**
@@ -143,6 +191,7 @@ class KazooApp {
             this.ui.stopBtn.classList.remove('hidden');
             this.ui.statusBar.classList.remove('hidden');
             this.ui.visualizer.classList.remove('hidden');
+            this.ui.advancedSettings.classList.remove('hidden'); // 显示高级设置
             this.ui.systemStatus.textContent = 'Running';
             this.ui.systemStatus.classList.add('active');
             this.ui.recordingStatus.textContent = 'Playing';
@@ -185,6 +234,11 @@ class KazooApp {
         const volume = audioInputManager.getVolume(audioBuffer);
         const pitchInfo = pitchDetector.detect(audioBuffer, volume);
 
+        // 简化调试日志
+        if (Math.random() < 0.02 && pitchInfo) {
+            console.log(`[Audio] ${pitchInfo.note}${pitchInfo.octave} ${pitchInfo.frequency.toFixed(1)}Hz Conf:${pitchInfo.confidence.toFixed(2)}`);
+        }
+
         if (pitchInfo) {
             // 更新显示
             this.ui.currentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
@@ -202,8 +256,8 @@ class KazooApp {
             const metrics = performanceMonitor.getMetrics();
             this.ui.latency.textContent = `${metrics.totalLatency}ms`;
         } else {
-            // 没有音高，停止发声
-            synthesizerEngine.stopNote();
+            // 没有音高，不立即停止（由延迟释放机制处理）
+            // synthesizerEngine.stopNote(); // 移除此行，避免立即停止
         }
     }
 

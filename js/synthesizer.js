@@ -23,8 +23,20 @@ class SynthesizerEngine {
             volume: 0
         };
 
-        // 音符触发阈值（降低到 0.01 以适应用户的麦克风）
-        this.minConfidence = 0.01;
+        // 置信度阈值（降低到0.03以确保能触发）
+        this.minConfidence = 0.03;
+
+        // 滑音配置
+        this.glideTime = 0.05; // 50ms滑音时间（快速但平滑）
+        this.lastFrequency = 0;
+
+        // 音符持续模式（避免频繁重触发）
+        this.sustainMode = true; // 启用持续模式
+        this.noteChangeThreshold = 100; // 频率变化超过100 cents才算换音符
+
+        // 声音释放定时器
+        this.releaseTimer = null;
+        this.releaseDelay = 150; // 150ms无输入后才释放声音
     }
 
     /**
@@ -98,7 +110,7 @@ class SynthesizerEngine {
             this.currentSynth.dispose();
         }
 
-        // 创建新合成器
+        // 创建新合成器 - 优化包络参数以支持连续滑音
         switch (instrument) {
             case 'saxophone':
                 this.currentSynth = new Tone.FMSynth({
@@ -106,31 +118,34 @@ class SynthesizerEngine {
                     modulationIndex: 12,
                     oscillator: { type: 'sine' },
                     envelope: {
-                        attack: 0.01,
-                        decay: 0.2,
-                        sustain: 0.8,
-                        release: 0.3
+                        attack: 0.05,      // 稍长的attack避免爆音
+                        decay: 0.1,        // 短衰减
+                        sustain: 0.95,     // 高sustain保持连续
+                        release: 0.4       // 柔和释放
                     },
                     modulation: { type: 'square' },
                     modulationEnvelope: {
-                        attack: 0.5,
-                        decay: 0.2,
+                        attack: 0.3,
+                        decay: 0.1,
                         sustain: 1,
-                        release: 0.5
+                        release: 0.3
                     }
                 });
+                // 设置portamento用于额外平滑
+                this.currentSynth.portamento = 0.05;
                 break;
 
             case 'violin':
                 this.currentSynth = new Tone.Synth({
                     oscillator: { type: 'sawtooth' },
                     envelope: {
-                        attack: 0.1,
-                        decay: 0.2,
-                        sustain: 0.9,
-                        release: 0.4
+                        attack: 0.08,      // 拉弓启动时间
+                        decay: 0.1,
+                        sustain: 0.95,     // 高sustain支持连续演奏
+                        release: 0.5       // 柔和释放
                     }
                 });
+                this.currentSynth.portamento = 0.05;
                 this.vibrato.frequency.value = 6;
                 this.vibrato.depth.value = 0.3;
                 break;
@@ -145,6 +160,7 @@ class SynthesizerEngine {
                         release: 1
                     }
                 });
+                // 钢琴不需要portamento（弹拨类）
                 break;
 
             case 'flute':
@@ -152,19 +168,20 @@ class SynthesizerEngine {
                     harmonicity: 2,
                     oscillator: { type: 'sine' },
                     envelope: {
-                        attack: 0.02,
-                        decay: 0.1,
-                        sustain: 0.8,
-                        release: 0.2
+                        attack: 0.03,      // 吹气启动
+                        decay: 0.05,
+                        sustain: 0.95,     // 高sustain保持气流
+                        release: 0.3
                     },
                     modulation: { type: 'square' },
                     modulationEnvelope: {
-                        attack: 0.5,
-                        decay: 0.2,
+                        attack: 0.3,
+                        decay: 0.1,
                         sustain: 1,
-                        release: 0.5
+                        release: 0.3
                     }
                 });
+                this.currentSynth.portamento = 0.05;
                 break;
 
             case 'guitar':
@@ -173,18 +190,20 @@ class SynthesizerEngine {
                     dampening: 4000,
                     resonance: 0.9
                 });
+                // 吉他不需要portamento（弹拨类）
                 break;
 
             case 'synth':
                 this.currentSynth = new Tone.Synth({
                     oscillator: { type: 'square' },
                     envelope: {
-                        attack: 0.005,
-                        decay: 0.1,
-                        sustain: 0.7,
-                        release: 0.2
+                        attack: 0.01,
+                        decay: 0.05,
+                        sustain: 0.9,      // 高sustain
+                        release: 0.3
                     }
                 });
+                this.currentSynth.portamento = 0.05;
                 break;
 
             default:
@@ -201,7 +220,7 @@ class SynthesizerEngine {
     }
 
     /**
-     * 处理音高信息并触发音符 - 优化快速响应
+     * 处理音高信息 - 简化版连续模式
      */
     processPitch(pitchInfo) {
         if (!pitchInfo || !this.currentSynth) return;
@@ -210,30 +229,49 @@ class SynthesizerEngine {
 
         // 检查置信度阈值
         if (confidence < this.minConfidence) {
-            if (this.isPlaying) {
-                this.stopNote();
-            }
+            // 延迟释放
+            this.scheduleRelease();
             return;
         }
+
+        // 取消释放计划
+        this.cancelRelease();
 
         const fullNote = `${note}${octave}`;
 
         // 更新表现力参数
         this.updateExpressiveness(pitchInfo);
 
-        // 快速音符切换 - 不等待 stopNote 完成
+        // 如果未播放，启动声音
+        if (!this.isPlaying) {
+            this.playNote(fullNote, frequency, volume);
+            this.lastFrequency = frequency;
+            this.currentNote = fullNote;
+            return;
+        }
+
+        // 已经在播放，判断是否需要改变音高
         if (fullNote !== this.currentNote) {
-            // 立即停止旧音符并触发新音符
-            if (this.isPlaying) {
+            // 音符改变了
+            // 对于弹拨类乐器：必须重触发
+            if (this.currentInstrument === 'guitar' || this.currentInstrument === 'piano') {
                 try {
                     this.currentSynth.triggerRelease(Tone.now());
                 } catch (e) {}
+                this.playNote(fullNote, frequency, volume);
+            } else {
+                // 持续类乐器：使用滑音
+                this.glideToFrequency(frequency);
             }
-            this.playNote(fullNote, frequency, volume);
+            this.currentNote = fullNote;
         } else {
-            // 相同音符，保持播放
-            this.updatePitch(frequency);
+            // 同一音符，微调频率（滑音效果）
+            if (Math.abs(frequency - this.lastFrequency) > 1) {
+                this.glideToFrequency(frequency);
+            }
         }
+
+        this.lastFrequency = frequency;
     }
 
     /**
@@ -243,6 +281,8 @@ class SynthesizerEngine {
         try {
             const now = Tone.now();
             const velocity = Math.min(Math.max(volume * 2, 0.1), 1);
+
+            console.log(`[Synth] 🎵 Playing: ${note} @ ${frequency.toFixed(1)}Hz, vel=${velocity.toFixed(2)}`);
 
             // 对于弹拨类乐器使用triggerAttackRelease
             if (this.currentInstrument === 'guitar' || this.currentInstrument === 'piano') {
@@ -258,6 +298,7 @@ class SynthesizerEngine {
 
         } catch (error) {
             console.error('[Synthesizer] ❌ Error playing note:', error);
+            console.error('Error details:', error.stack);
         }
     }
 
@@ -270,6 +311,7 @@ class SynthesizerEngine {
                 this.currentSynth.triggerRelease(Tone.now());
                 this.isPlaying = false;
                 this.currentNote = null;
+                this.lastFrequency = 0;
             } catch (error) {
                 console.error('Error stopping note:', error);
             }
@@ -277,17 +319,49 @@ class SynthesizerEngine {
     }
 
     /**
-     * 更新音高（用于滑音效果）
+     * 滑音到目标频率 - 使用exponentialRampTo实现平滑过渡
      */
-    updatePitch(frequency) {
-        // Tone.js的音高弯曲需要更复杂的实现
-        // 这里简化处理，仅在频率偏差较大时重新触发
-        if (this.currentFrequency > 0) {
-            const deviation = Math.abs(frequency - this.currentFrequency) / this.currentFrequency;
-            if (deviation > 0.02) { // 2%偏差
-                this.currentFrequency = frequency;
-                // 可以在这里实现portamento效果
+    glideToFrequency(targetFrequency) {
+        if (!this.currentSynth || !this.isPlaying) return;
+
+        try {
+            const now = Tone.now();
+
+            // 对于支持frequency参数的合成器
+            if (this.currentSynth.frequency) {
+                // 使用exponentialRampTo创建平滑的音高过渡
+                this.currentSynth.frequency.exponentialRampTo(
+                    targetFrequency,
+                    this.glideTime,
+                    now
+                );
             }
+
+            this.currentFrequency = targetFrequency;
+        } catch (error) {
+            console.error('[Synthesizer] Glide error:', error);
+        }
+    }
+
+    /**
+     * 计划延迟释放声音
+     */
+    scheduleRelease() {
+        if (this.releaseTimer) return; // 已有计划，不重复
+
+        this.releaseTimer = setTimeout(() => {
+            this.stopNote();
+            this.releaseTimer = null;
+        }, this.releaseDelay);
+    }
+
+    /**
+     * 取消释放计划
+     */
+    cancelRelease() {
+        if (this.releaseTimer) {
+            clearTimeout(this.releaseTimer);
+            this.releaseTimer = null;
         }
     }
 

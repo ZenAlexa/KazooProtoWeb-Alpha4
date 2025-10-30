@@ -234,11 +234,45 @@ class KazooApp {
     }
 
     /**
-     * 更新可视化 - 简化版本，只显示基本信息
+     * 更新可视化 - 简易音高曲线
      */
     updateVisualizer(pitchInfo) {
-        // 可视化已简化 - 主要信息通过状态栏显示
-        // 如需要可视化，未来可以添加简单的音符指示器
+        const { ctx, minFreq, maxFreq } = this.visualizer;
+        const canvas = this.ui.pitchCanvas;
+
+        // 存储历史数据
+        this.visualizer.history.push(pitchInfo.frequency);
+        if (this.visualizer.history.length > this.visualizer.maxHistory) {
+            this.visualizer.history.shift();
+        }
+
+        // 清空画布
+        ctx.fillStyle = '#f9fafb';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 绘制简单的音高曲线
+        if (this.visualizer.history.length > 1) {
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+
+            const xStep = canvas.width / this.visualizer.maxHistory;
+            this.visualizer.history.forEach((freq, i) => {
+                const x = i * xStep;
+                const normalized = (freq - minFreq) / (maxFreq - minFreq);
+                const y = canvas.height - (normalized * canvas.height * 0.8) - canvas.height * 0.1;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+        }
     }
 }
 

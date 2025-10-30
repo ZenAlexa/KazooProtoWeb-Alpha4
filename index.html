@@ -90,6 +90,16 @@
                         <span class="instrument-name">Synth</span>
                         <span class="instrument-desc">Electronic & Modern</span>
                     </button>
+                    <button class="instrument-btn" disabled style="opacity: 0.4; cursor: not-allowed;">
+                        <span class="instrument-icon">🎺</span>
+                        <span class="instrument-name">Trumpet</span>
+                        <span class="instrument-desc">To Be Continued...</span>
+                    </button>
+                    <button class="instrument-btn" disabled style="opacity: 0.4; cursor: not-allowed;">
+                        <span class="instrument-icon">🥁</span>
+                        <span class="instrument-name">Drums</span>
+                        <span class="instrument-desc">Coming Soon!</span>
+                    </button>
                 </div>
             </div>
 
@@ -131,38 +141,59 @@
             </div>
         </div>
 
-        <!-- 可视化 -->
-        <div class="visualizer hidden" id="visualizer">
-            <canvas id="pitchCanvas" width="900" height="160"></canvas>
-            <div class="pitch-display">
-                <div class="current-note" id="currentNote">--</div>
-                <div class="current-freq" id="currentFreq">--</div>
+        <!-- 可视化 - 紧凑布局 -->
+        <div class="visualizer hidden" id="visualizer" style="margin-top: 20px;">
+            <div style="display: flex; align-items: center; gap: 24px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <!-- 音符显示 -->
+                <div style="min-width: 140px;">
+                    <div style="font-size: 14px; color: #6b7280; margin-bottom: 4px;">Current Note</div>
+                    <div class="current-note" id="currentNote" style="font-size: 32px; font-weight: bold; color: #1e3a8a;">--</div>
+                    <div class="current-freq" id="currentFreq" style="font-size: 14px; color: #6b7280; margin-top: 4px;">--</div>
+                </div>
+
+                <!-- 音高曲线 -->
+                <div style="flex: 1;">
+                    <canvas id="pitchCanvas" width="600" height="80" style="width: 100%; height: 80px;"></canvas>
+                </div>
             </div>
         </div>
 
         <!-- 帮助部分 -->
         <section class="help-section">
-            <button class="btn-text" id="helpToggle">Troubleshooting</button>
+            <button class="btn-text" id="helpToggle">💡 Tips & Easter Eggs</button>
             <div class="help-content" id="helpContent">
-                <h4 style="margin-bottom: 12px;">System Requirements</h4>
+                <h4 style="margin-bottom: 12px;">🎤 Pro Tips</h4>
                 <ul style="margin-left: 20px; margin-bottom: 16px;">
-                    <li>Chrome, Edge, or Firefox (latest version)</li>
-                    <li>Microphone access permission</li>
-                    <li>HTTPS or localhost connection</li>
+                    <li>🎧 Use headphones to prevent feedback (or you'll create an infinite echo loop!)</li>
+                    <li>📏 Keep microphone 10-20cm away (close enough to hear, far enough not to eat it)</li>
+                    <li>🎵 Sing steady notes rather than sliding (we're not a theremin... yet!)</li>
+                    <li>🤫 Quiet environment works best (your cat's meowing won't become music... unfortunately)</li>
                 </ul>
 
-                <h4 style="margin-bottom: 12px;">Tips for Best Results</h4>
+                <h4 style="margin-bottom: 12px;">🎭 Fun Facts</h4>
                 <ul style="margin-left: 20px; margin-bottom: 16px;">
-                    <li>Use headphones to prevent feedback</li>
-                    <li>Keep microphone 10-20cm from your mouth</li>
-                    <li>Sing steady notes rather than sliding</li>
-                    <li>Use in a quiet environment</li>
+                    <li>🎷 The saxophone was invented by Adolphe Sax in 1846. Now you can become Adolphe!</li>
+                    <li>⚡ Our latency is <50ms - faster than you can say "supercalifragilisticexpialidocious"</li>
+                    <li>🧠 The YIN algorithm behind this uses some serious math. Don't worry, we did it for you!</li>
+                    <li>🎹 You're basically a human MIDI controller now. Welcome to the future!</li>
+                </ul>
+
+                <h4 style="margin-bottom: 12px;">🐛 Troubleshooting</h4>
+                <ul style="margin-left: 20px; margin-bottom: 16px;">
+                    <li>No sound? Check if your mic is on (not on mute, not in the dishwasher)</li>
+                    <li>Weird sounds? That might just be your singing... kidding! Try a different instrument</li>
+                    <li>High latency? Close that 47-tab browser session. We know it's there.</li>
                 </ul>
 
                 <div class="warning-box hidden" id="warningBox">
-                    <strong>Issues Detected:</strong>
+                    <strong>⚠️ Issues Detected:</strong>
                     <div id="warningText"></div>
                 </div>
+
+                <p style="margin-top: 20px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 14px;">
+                    <strong>🎁 Secret:</strong> Try humming the main theme of your favorite movie.
+                    Does it sound epic? That's because YOU are epic! 🌟
+                </p>
             </div>
         </section>
     </div>

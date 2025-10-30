@@ -25,10 +25,48 @@ class AudioInputManager {
     }
 
     /**
+     * 检查浏览器兼容性
+     */
+    checkBrowserSupport() {
+        const issues = [];
+
+        // 检查AudioContext
+        if (!window.AudioContext && !window.webkitAudioContext) {
+            issues.push('你的浏览器不支持Web Audio API');
+        }
+
+        // 检查getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            issues.push('你的浏览器不支持麦克风访问');
+        }
+
+        // 检查是否在HTTPS或localhost
+        const isSecureContext = window.isSecureContext ||
+                               location.protocol === 'https:' ||
+                               location.hostname === 'localhost' ||
+                               location.hostname === '127.0.0.1';
+
+        if (!isSecureContext) {
+            issues.push('麦克风需要HTTPS连接或localhost环境');
+        }
+
+        return {
+            isSupported: issues.length === 0,
+            issues: issues
+        };
+    }
+
+    /**
      * 初始化音频上下文
      */
     async initialize() {
         try {
+            // 检查浏览器支持
+            const support = this.checkBrowserSupport();
+            if (!support.isSupported) {
+                throw new Error('浏览器不支持:\n' + support.issues.join('\n'));
+            }
+
             // 创建AudioContext，优化低延迟
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             this.audioContext = new AudioContextClass({
@@ -45,7 +83,7 @@ class AudioInputManager {
             return true;
         } catch (error) {
             console.error('Failed to initialize AudioContext:', error);
-            throw new Error('无法初始化音频系统');
+            throw error;
         }
     }
 
@@ -54,6 +92,11 @@ class AudioInputManager {
      */
     async startMicrophone() {
         try {
+            // 检查浏览器支持
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('你的浏览器不支持麦克风访问。请使用Chrome、Firefox或Edge浏览器。');
+            }
+
             // 请求麦克风访问
             this.stream = await navigator.mediaDevices.getUserMedia({
                 audio: {

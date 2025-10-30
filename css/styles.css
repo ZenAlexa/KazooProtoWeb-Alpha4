@@ -37,6 +37,39 @@ body {
     margin: 0 auto;
 }
 
+/* ===== 浏览器警告 ===== */
+.browser-warning {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(245, 158, 11, 0.2));
+    border: 2px solid var(--danger-color);
+    padding: 25px;
+    border-radius: 16px;
+    margin-bottom: 30px;
+    box-shadow: var(--shadow-lg);
+}
+
+.browser-warning h3 {
+    color: var(--danger-color);
+    margin-bottom: 15px;
+}
+
+.browser-warning p {
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.browser-warning ul {
+    margin-left: 20px;
+    color: var(--text-secondary);
+}
+
+.browser-warning li {
+    margin-bottom: 8px;
+}
+
+.browser-warning strong {
+    color: var(--text-primary);
+}
+
 /* ===== 头部 ===== */
 header {
     text-align: center;

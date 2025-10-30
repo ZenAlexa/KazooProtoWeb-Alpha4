@@ -70,6 +70,9 @@ class KazooProtoApp {
         try {
             console.log('Initializing Kazoo Proto App...');
 
+            // 检查浏览器兼容性
+            this.checkBrowserCompatibility();
+
             // 初始化可视化
             this.initializeVisualizer();
 
@@ -88,6 +91,26 @@ class KazooProtoApp {
         } catch (error) {
             console.error('Initialization failed:', error);
             alert('初始化失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 检查浏览器兼容性并显示警告
+     */
+    checkBrowserCompatibility() {
+        const support = audioInputManager.checkBrowserSupport();
+
+        if (!support.isSupported) {
+            const warningDiv = document.getElementById('browserWarning');
+            const issuesP = document.getElementById('browserIssues');
+
+            if (warningDiv && issuesP) {
+                issuesP.innerHTML = '<strong>检测到以下问题:</strong><br>' +
+                                   support.issues.map(issue => `• ${issue}`).join('<br>');
+                warningDiv.classList.remove('hidden');
+            }
+
+            console.warn('Browser compatibility issues:', support.issues);
         }
     }
 

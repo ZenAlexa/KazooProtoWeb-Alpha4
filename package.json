@@ -25,7 +25,10 @@
   ],
   "author": "Ziming Wang",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "pitchfinder": "^2.3.2",
+    "tone": "^15.1.22"
+  },
   "devDependencies": {
     "serve": "^14.2.1"
   },

@@ -204,12 +204,21 @@ class SynthesizerEngine {
      * 处理音高信息并触发音符
      */
     processPitch(pitchInfo) {
-        if (!pitchInfo || !this.currentSynth) return;
+        if (!pitchInfo) {
+            console.warn('[Synthesizer] No pitch info provided');
+            return;
+        }
+
+        if (!this.currentSynth) {
+            console.error('[Synthesizer] Synth not initialized!');
+            return;
+        }
 
         const { frequency, note, octave, confidence, volume } = pitchInfo;
 
         // 检查置信度阈值
         if (confidence < this.minConfidence) {
+            console.log(`[Synthesizer] Low confidence: ${confidence.toFixed(2)} < ${this.minConfidence}`);
             if (this.isPlaying) {
                 this.stopNote();
             }
@@ -217,6 +226,7 @@ class SynthesizerEngine {
         }
 
         const fullNote = `${note}${octave}`;
+        console.log(`[Synthesizer] Processing: ${fullNote} (${frequency.toFixed(1)}Hz, conf: ${confidence.toFixed(2)}, vol: ${volume.toFixed(2)})`);
 
         // 更新表现力参数
         this.updateExpressiveness(pitchInfo);
@@ -241,12 +251,17 @@ class SynthesizerEngine {
             const now = Tone.now();
             const velocity = Math.min(Math.max(volume * 2, 0.1), 1);
 
+            console.log(`[Synthesizer] 🎵 Playing note: ${note}, velocity: ${velocity.toFixed(2)}, instrument: ${this.currentInstrument}`);
+            console.log(`[Synthesizer] Tone.context.state: ${Tone.context.state}`);
+
             // 对于弹拨类乐器使用triggerAttackRelease
             if (this.currentInstrument === 'guitar' || this.currentInstrument === 'piano') {
                 this.currentSynth.triggerAttackRelease(note, '0.5', now, velocity);
+                console.log(`[Synthesizer] Triggered pluck/strike sound`);
             } else {
                 // 对于持续类乐器使用triggerAttack
                 this.currentSynth.triggerAttack(note, now, velocity);
+                console.log(`[Synthesizer] Triggered sustained sound`);
             }
 
             this.isPlaying = true;
@@ -254,7 +269,7 @@ class SynthesizerEngine {
             this.currentFrequency = frequency;
 
         } catch (error) {
-            console.error('Error playing note:', error);
+            console.error('[Synthesizer] ❌ Error playing note:', error);
         }
     }
 

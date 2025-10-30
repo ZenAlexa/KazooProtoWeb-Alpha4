@@ -222,6 +222,22 @@ class ContinuousSynthEngine {
      * 处理音高信息 - 核心方法（替代旧的processPitch）
      * @param {Object} pitchInfo - { frequency, note, octave, confidence, volume }
      */
+    /**
+     * Phase 2: 处理完整的 PitchFrame (包含表现力特征)
+     *
+     * @param {PitchFrame} pitchFrame - 完整的音高和表现力数据
+     */
+    processPitchFrame(pitchFrame) {
+        // Phase 2.7 TODO: 使用 PitchFrame 的表现力特征
+        // - pitchFrame.cents → 精确的 Pitch Bend
+        // - pitchFrame.brightness → Filter Cutoff
+        // - pitchFrame.breathiness → Noise Amount
+        // - pitchFrame.articulation → ADSR Trigger
+
+        // 当前: 回退到基础 processPitch (向后兼容)
+        this.processPitch(pitchFrame);
+    }
+
     processPitch(pitchInfo) {
         if (!pitchInfo || !this.currentSynth) return;
 

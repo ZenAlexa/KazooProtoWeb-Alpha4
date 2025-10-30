@@ -203,6 +203,22 @@ class SynthesizerEngine {
     /**
      * 处理音高信息并触发音符 - 优化快速响应
      */
+    /**
+     * Phase 2: 处理完整的 PitchFrame (包含表现力特征)
+     *
+     * @param {PitchFrame} pitchFrame - 完整的音高和表现力数据
+     */
+    processPitchFrame(pitchFrame) {
+        // Phase 2.8 TODO: 使用 PitchFrame 的表现力特征
+        // - pitchFrame.articulation → 智能音符触发 (attack/sustain/release)
+        // - pitchFrame.volumeDb → 动态 Velocity 控制
+        // - pitchFrame.brightness → Filter Cutoff
+        // - pitchFrame.cents → 微调音高偏移
+
+        // 当前: 回退到基础 processPitch (向后兼容)
+        this.processPitch(pitchFrame);
+    }
+
     processPitch(pitchInfo) {
         if (!pitchInfo || !this.currentSynth) return;
 

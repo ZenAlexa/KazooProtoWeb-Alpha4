@@ -3,6 +3,7 @@
  * 极简设计：选择乐器 → 开始播放
  *
  * Phase 1: 集成 AudioIO 低延迟音频抽象层
+ * Phase 2: 集成 ExpressiveFeatures 表现力特征提取管线
  */
 class KazooApp {
     constructor() {
@@ -16,6 +17,9 @@ class KazooApp {
         // Phase 2: 双引擎模式
         this.useContinuousMode = true;  // 默认使用新引擎
         this.currentEngine = null;      // 当前激活的引擎
+
+        // Phase 2: 表现力特征提取
+        this.expressiveFeatures = null;  // ExpressiveFeatures 实例
 
         // UI元素
         this.ui = {
@@ -260,6 +264,7 @@ class KazooApp {
 
     /**
      * 初始化合成器引擎和音高检测器
+     * Phase 2: 添加 ExpressiveFeatures 初始化
      */
     async _initializeEngines(audioContext) {
         // 选择引擎
@@ -281,6 +286,16 @@ class KazooApp {
         if (audioContext && !pitchDetector.detector) {
             console.log('Initializing pitch detector...');
             pitchDetector.initialize(audioContext.sampleRate);
+        }
+
+        // Phase 2: 初始化 ExpressiveFeatures
+        if (!this.expressiveFeatures) {
+            console.log('🎨 [Phase 2] Initializing ExpressiveFeatures...');
+            const { ExpressiveFeatures } = await import('./expressive-features.js');
+            this.expressiveFeatures = new ExpressiveFeatures({
+                sampleRate: audioContext ? audioContext.sampleRate : 44100,
+                bufferSize: this.useAudioIO ? 128 : 2048
+            });
         }
     }
 
@@ -320,7 +335,10 @@ class KazooApp {
 
     /**
      * Phase 1: 处理来自 AudioWorklet 的音高检测结果
-     * 直接使用检测结果,无需再次调用 pitchDetector
+     * Phase 2: 集成 ExpressiveFeatures，生成完整 PitchFrame
+     *
+     * 注意: AudioWorklet 模式下，目前 pitchInfo 来自 Worklet，
+     *       但 audioBuffer 不可用。Phase 2.6 需要在 Worklet 中传递 buffer。
      */
     onPitchDetected(pitchInfo) {
         if (!this.isRunning || !this.currentEngine) return;
@@ -328,16 +346,37 @@ class KazooApp {
         // 性能监控开始
         performanceMonitor.startProcessing();
 
-        // 更新显示
-        this.ui.currentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
-        this.ui.currentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
-        this.ui.confidence.textContent = `${Math.round(pitchInfo.confidence * 100)}%`;
+        // Phase 2: 生成 PitchFrame (暂时没有 audioBuffer，用空数组占位)
+        let pitchFrame = pitchInfo;  // 默认使用原始 pitchInfo
+        if (this.expressiveFeatures) {
+            try {
+                // TODO Phase 2.6: AudioWorklet 需要传递 audioBuffer
+                const dummyBuffer = new Float32Array(128);  // 临时占位
+                pitchFrame = this.expressiveFeatures.process({
+                    pitchInfo,
+                    audioBuffer: dummyBuffer,
+                    timestamp: performance.now()
+                });
+            } catch (error) {
+                console.error('[ExpressiveFeatures Error]', error);
+                pitchFrame = pitchInfo;  // 回退到基础 pitchInfo
+            }
+        }
 
-        // 驱动当前引擎发声
-        this.currentEngine.processPitch(pitchInfo);
+        // 更新显示
+        this.ui.currentNote.textContent = `${pitchFrame.note}${pitchFrame.octave}`;
+        this.ui.currentFreq.textContent = `${pitchFrame.frequency.toFixed(1)} Hz`;
+        this.ui.confidence.textContent = `${Math.round(pitchFrame.confidence * 100)}%`;
+
+        // Phase 2: 驱动当前引擎 (优先使用 processPitchFrame，回退到 processPitch)
+        if (this.currentEngine.processPitchFrame) {
+            this.currentEngine.processPitchFrame(pitchFrame);
+        } else {
+            this.currentEngine.processPitch(pitchInfo);
+        }
 
         // 可视化
-        this.updateVisualizer(pitchInfo);
+        this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
         performanceMonitor.endProcessing();
@@ -349,7 +388,8 @@ class KazooApp {
     }
 
     /**
-     * 音频处理 - Phase 2: 根据模式使用不同引擎
+     * 音频处理 - Phase 2: 集成 ExpressiveFeatures 完整管线
+     * 数据流: AudioIO → PitchDetector → ExpressiveFeatures → Synth
      */
     onAudioProcess(audioBuffer) {
         if (!this.isRunning || !this.currentEngine) return;
@@ -361,16 +401,35 @@ class KazooApp {
         const pitchInfo = pitchDetector.detect(audioBuffer, volume);
 
         if (pitchInfo) {
-            // 更新显示
-            this.ui.currentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
-            this.ui.currentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
-            this.ui.confidence.textContent = `${Math.round(pitchInfo.confidence * 100)}%`;
+            // Phase 2: 生成完整 PitchFrame (包含表现力特征)
+            let pitchFrame = pitchInfo;  // 默认使用基础 pitchInfo
+            if (this.expressiveFeatures) {
+                try {
+                    pitchFrame = this.expressiveFeatures.process({
+                        pitchInfo,
+                        audioBuffer,  // ScriptProcessor 模式有完整 buffer
+                        timestamp: performance.now()
+                    });
+                } catch (error) {
+                    console.error('[ExpressiveFeatures Error]', error);
+                    pitchFrame = pitchInfo;  // 回退到基础 pitchInfo
+                }
+            }
 
-            // Phase 2: 驱动当前引擎发声
-            this.currentEngine.processPitch(pitchInfo);
+            // 更新显示
+            this.ui.currentNote.textContent = `${pitchFrame.note}${pitchFrame.octave}`;
+            this.ui.currentFreq.textContent = `${pitchFrame.frequency.toFixed(1)} Hz`;
+            this.ui.confidence.textContent = `${Math.round(pitchFrame.confidence * 100)}%`;
+
+            // Phase 2: 驱动当前引擎 (优先使用 processPitchFrame，回退到 processPitch)
+            if (this.currentEngine.processPitchFrame) {
+                this.currentEngine.processPitchFrame(pitchFrame);
+            } else {
+                this.currentEngine.processPitch(pitchInfo);
+            }
 
             // 可视化
-            this.updateVisualizer(pitchInfo);
+            this.updateVisualizer(pitchFrame);
         }
 
         // 性能监控结束

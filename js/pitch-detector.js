@@ -205,11 +205,6 @@ class PitchDetector {
             confidence = Math.min(confidence * 1.2, 1);
         }
 
-        // 调试日志 - 每10帧打印一次
-        if (Math.random() < 0.1) {
-            console.log(`[PitchDetector] RMS: ${rms.toFixed(4)}, Confidence: ${confidence.toFixed(2)}, Freq: ${frequency.toFixed(1)}Hz`);
-        }
-
         return confidence;
     }
 

@@ -23,8 +23,8 @@ class SynthesizerEngine {
             volume: 0
         };
 
-        // 音符触发阈值（降低到 0.10 以适应用户的麦克风）
-        this.minConfidence = 0.10;
+        // 音符触发阈值（降低到 0.01 以适应用户的麦克风）
+        this.minConfidence = 0.01;
     }
 
     /**
@@ -201,24 +201,15 @@ class SynthesizerEngine {
     }
 
     /**
-     * 处理音高信息并触发音符
+     * 处理音高信息并触发音符 - 优化快速响应
      */
     processPitch(pitchInfo) {
-        if (!pitchInfo) {
-            console.warn('[Synthesizer] No pitch info provided');
-            return;
-        }
-
-        if (!this.currentSynth) {
-            console.error('[Synthesizer] Synth not initialized!');
-            return;
-        }
+        if (!pitchInfo || !this.currentSynth) return;
 
         const { frequency, note, octave, confidence, volume } = pitchInfo;
 
         // 检查置信度阈值
         if (confidence < this.minConfidence) {
-            console.log(`[Synthesizer] Low confidence: ${confidence.toFixed(2)} < ${this.minConfidence}`);
             if (this.isPlaying) {
                 this.stopNote();
             }
@@ -226,42 +217,39 @@ class SynthesizerEngine {
         }
 
         const fullNote = `${note}${octave}`;
-        console.log(`[Synthesizer] Processing: ${fullNote} (${frequency.toFixed(1)}Hz, conf: ${confidence.toFixed(2)}, vol: ${volume.toFixed(2)})`);
 
         // 更新表现力参数
         this.updateExpressiveness(pitchInfo);
 
-        // 如果是新音符，触发新的音符
+        // 快速音符切换 - 不等待 stopNote 完成
         if (fullNote !== this.currentNote) {
+            // 立即停止旧音符并触发新音符
             if (this.isPlaying) {
-                this.stopNote();
+                try {
+                    this.currentSynth.triggerRelease(Tone.now());
+                } catch (e) {}
             }
             this.playNote(fullNote, frequency, volume);
         } else {
-            // 相同音符，更新音高弯曲（滑音效果）
+            // 相同音符，保持播放
             this.updatePitch(frequency);
         }
     }
 
     /**
-     * 播放音符
+     * 播放音符 - 优化版本，减少延迟
      */
     playNote(note, frequency, volume = 0.5) {
         try {
             const now = Tone.now();
             const velocity = Math.min(Math.max(volume * 2, 0.1), 1);
 
-            console.log(`[Synthesizer] 🎵 Playing note: ${note}, velocity: ${velocity.toFixed(2)}, instrument: ${this.currentInstrument}`);
-            console.log(`[Synthesizer] Tone.context.state: ${Tone.context.state}`);
-
             // 对于弹拨类乐器使用triggerAttackRelease
             if (this.currentInstrument === 'guitar' || this.currentInstrument === 'piano') {
                 this.currentSynth.triggerAttackRelease(note, '0.5', now, velocity);
-                console.log(`[Synthesizer] Triggered pluck/strike sound`);
             } else {
                 // 对于持续类乐器使用triggerAttack
                 this.currentSynth.triggerAttack(note, now, velocity);
-                console.log(`[Synthesizer] Triggered sustained sound`);
             }
 
             this.isPlaying = true;

@@ -234,103 +234,11 @@ class KazooApp {
     }
 
     /**
-     * 更新可视化 - 增强版本，带音符标签和网格线
+     * 更新可视化 - 简化版本，只显示基本信息
      */
     updateVisualizer(pitchInfo) {
-        const { ctx, minFreq, maxFreq, referenceNotes } = this.visualizer;
-        const canvas = this.ui.pitchCanvas;
-
-        // 存储历史数据
-        this.visualizer.history.push(pitchInfo.frequency);
-        this.visualizer.noteHistory.push(`${pitchInfo.note}${pitchInfo.octave}`);
-
-        if (this.visualizer.history.length > this.visualizer.maxHistory) {
-            this.visualizer.history.shift();
-            this.visualizer.noteHistory.shift();
-        }
-
-        // 清空画布
-        ctx.fillStyle = '#f9fafb';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // 绘制参考音符网格线
-        ctx.strokeStyle = '#e5e7eb';
-        ctx.lineWidth = 1;
-        ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto';
-        ctx.fillStyle = '#9ca3af';
-
-        referenceNotes.forEach(ref => {
-            const normalized = (ref.freq - minFreq) / (maxFreq - minFreq);
-            const y = canvas.height - (normalized * canvas.height);
-
-            // 绘制水平参考线
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-
-            // 绘制音符标签
-            ctx.fillText(ref.note, 5, y - 5);
-        });
-
-        // 绘制音高曲线
-        if (this.visualizer.history.length > 1) {
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-
-            const xStep = canvas.width / this.visualizer.maxHistory;
-            this.visualizer.history.forEach((freq, i) => {
-                const x = i * xStep;
-                const normalized = (freq - minFreq) / (maxFreq - minFreq);
-                const y = canvas.height - (normalized * canvas.height);
-
-                if (i === 0) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
-            });
-
-            ctx.stroke();
-
-            // 绘制当前音符标签（在曲线末端）
-            if (this.visualizer.noteHistory.length > 0) {
-                const lastFreq = this.visualizer.history[this.visualizer.history.length - 1];
-                const lastNote = this.visualizer.noteHistory[this.visualizer.noteHistory.length - 1];
-                const lastX = (this.visualizer.history.length - 1) * xStep;
-                const lastNormalized = (lastFreq - minFreq) / (maxFreq - minFreq);
-                const lastY = canvas.height - (lastNormalized * canvas.height);
-
-                // 绘制当前音符的圆点
-                ctx.fillStyle = '#3b82f6';
-                ctx.beginPath();
-                ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
-                ctx.fill();
-
-                // 绘制音符标签背景
-                ctx.fillStyle = '#1e3a8a';
-                ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto';
-                const textMetrics = ctx.measureText(lastNote);
-                const padding = 6;
-                const labelX = Math.min(lastX + 10, canvas.width - textMetrics.width - padding * 2);
-                const labelY = Math.max(lastY - 10, 20);
-
-                ctx.fillRect(labelX - padding, labelY - 16, textMetrics.width + padding * 2, 22);
-
-                // 绘制音符文本
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText(lastNote, labelX, labelY);
-            }
-        }
-
-        // 绘制频率范围标签
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto';
-        ctx.fillText(`${maxFreq.toFixed(0)}Hz`, canvas.width - 60, 15);
-        ctx.fillText(`${minFreq.toFixed(0)}Hz`, canvas.width - 60, canvas.height - 5);
+        // 可视化已简化 - 主要信息通过状态栏显示
+        // 如需要可视化，未来可以添加简单的音符指示器
     }
 }
 

@@ -1,228 +1,122 @@
-# 🎵 Kazoo Proto Web - Transform Your Voice
+# Kazoo Proto - Real-time Voice to Instrument
 
-将你的哼唱实时转换为多种乐器音色！
+Transform your voice into musical instruments in real-time with ultra-low latency.
 
-[![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?logo=vercel)](https://vercel.com)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active-success)]()
+## Features
 
-## ✨ 功能特性
+- **Real-time pitch detection** - YIN algorithm
+- **6 instruments** - Saxophone, Violin, Piano, Flute, Guitar, Synth
+- **Ultra-low latency** - <50ms end-to-end
+- **Zero setup** - No calibration required
+- **Browser-based** - Works entirely in your browser
 
-- 🎤 **实时音高检测** - 使用YIN算法进行精确的音高检测
-- 🎸 **6种乐器音色** - Saxophone, Violin, Piano, Flute, Guitar, Synth
-- 🎯 **智能校准系统** - 自动检测你的音域范围 (10秒两步校准)
-- ⚡ **超低延迟** - 优化至 < 20ms 的端到端延迟
-- 📊 **实时可视化** - 音高曲线和实时音符显示
-- 🎛️ **表现力映射** - 从人声提取音量、颤音等表现力参数
-- 🎨 **现代UI设计** - Apple风格、动画效果、响应式布局
-
-## 🚀 快速开始
-
-### 在线体验
-
-**部署状态**: ✅ 已修复404错误
-
-直接访问你的Vercel部署链接 (通过Vercel Dashboard获取)
-
-### 本地运行
+## Quick Start
 
 ```bash
-# 克隆仓库
-git clone https://github.com/zimingwang/KazooProtoWeb-Alpha4.git
-cd KazooProtoWeb-Alpha4
+# Start local server
+npm start
 
-# 安装依赖
-npm install
-
-# 启动开发服务器
-npm run dev
-
-# 在浏览器访问 http://localhost:3000
+# Open browser
+http://localhost:3000
 ```
 
-## 📖 使用指南
+**Usage:**
+1. Select an instrument
+2. Click "Start Playing"
+3. Allow microphone access
+4. Hum or sing
 
-### 三步开始音乐创作
+## Requirements
 
-1. **🎤 校准声音 (10秒)**
-   - 点击 "Start Calibration" 按钮
-   - 允许浏览器使用麦克风
-   - **Step 1**: 唱出你能唱的最低音并保持5秒
-   - **Step 2**: 唱出你能唱的最高音并保持5秒
-   - 系统会自动进入下一步，无需手动操作
+- Modern browser (Chrome recommended)
+- Microphone access
+- HTTPS or localhost
 
-2. **🎸 选择乐器**
-   - 从6种乐器中选择：Saxophone (默认), Violin, Piano, Flute, Guitar, Synth
-   - 每种乐器都有独特的音色特征
+## Tips
 
-3. **🎵 开始演奏**
-   - 点击 "Start Recording"
-   - 对着麦克风哼唱或唱歌
-   - 实时听到你的声音转换为选定的乐器音色！
+- Use headphones to prevent feedback
+- Sing steady notes (not sliding)
+- Keep microphone 10-20cm away
+- Quiet environment for best results
 
-### 💡 使用技巧
+## Technical Stack
 
-- 使用有线耳机减少延迟和回声
-- 保持麦克风距离 10-20cm
-- 在安静环境中使用效果最佳
-- 音高稳定比音量大更重要
+- **Pitch Detection**: YIN algorithm
+- **Audio Synthesis**: Tone.js v15
+- **Audio Input**: Web Audio API
+- **UI**: Vanilla JavaScript + CSS
 
-## 🛠️ 技术栈
+## Configuration
 
-- **Web Audio API** - 音频处理基础
-- **Tone.js** - 音频合成框架
-- **Pitchfinder (YIN)** - 音高检测库
-- **原生 JavaScript** - 无框架依赖
-- **Vercel** - 部署平台
-
-## 📊 系统架构
-
-```
-麦克风输入 → 音频处理 → YIN音高检测 → Tone.js合成 → 音频输出
-                ↓
-            校准系统
-                ↓
-            性能监控
+### Confidence Threshold
+Adjust in `js/synthesizer.js`:
+```javascript
+this.minConfidence = 0.01;  // Lower = more sensitive
 ```
 
-## 🎯 性能优化
+### Buffer Size
+Adjust in `js/audio-input.js`:
+```javascript
+this.bufferSize = 2048;  // Lower = less latency
+```
 
-- AudioContext 配置为 `latencyHint: 'interactive'`
-- 缓冲区大小优化至 2048 samples
-- 使用 ScriptProcessor 实时音频处理
-- 音高平滑和中值滤波减少抖动
+## Performance
 
-## 🔧 高级配置
+- **Latency**: 10-30ms typical
+- **CPU Usage**: ~5-10%
+- **Buffer**: 2048 samples (46ms @ 44.1kHz)
 
-在高级设置面板中可调整：
+## Troubleshooting
 
-- **灵敏度** - 控制音高检测的音量阈值
-- **音高平滑** - 控制音高曲线的平滑程度
-- **混音比例** - 原声与合成声的混合比例
-- **最小置信度** - 触发音符的置信度阈值
+**No sound?**
+- Check microphone permissions
+- Increase volume
+- Try different instrument
+- Sing louder
 
-## 📝 开发说明
+**High latency?**
+- Close other apps
+- Use wired headphones
+- Reduce buffer size
 
-### 项目结构
+**Poor detection?**
+- Sing louder
+- Move closer to mic
+- Reduce background noise
+
+## Deployment
+
+### Vercel
+```bash
+npm run deploy
+```
+
+### Static Hosting
+Upload all files to any static host (Netlify, GitHub Pages, etc.)
+
+**Note**: HTTPS required for microphone access
+
+## Project Structure
 
 ```
-KazooProtoWeb-Alpha4/
-├── index.html              # 主页面
-├── css/
-│   └── styles.css          # 样式文件
+├── index.html
+├── css/styles.css
 ├── js/
-│   ├── audio-input.js      # 麦克风输入管理
-│   ├── pitch-detector.js   # YIN音高检测
-│   ├── synthesizer.js      # Tone.js合成器
-│   ├── calibration.js      # 校准模块
-│   ├── performance.js      # 性能监控
-│   └── main.js             # 主控制器
-├── package.json            # 项目配置
-└── vercel.json             # 部署配置
+│   ├── main.js
+│   ├── audio-input.js
+│   ├── pitch-detector.js
+│   ├── synthesizer.js
+│   ├── performance.js
+│   └── lib/
+│       ├── tone.js
+│       └── pitchfinder-browser.js
+└── package.json
 ```
 
-### 核心模块
+## License
 
-1. **AudioInputManager** - 管理麦克风输入和音频流
-2. **PitchDetector** - YIN算法音高检测
-3. **SynthesizerEngine** - 多乐器音色合成
-4. **CalibrationSystem** - 用户音域校准
-5. **PerformanceMonitor** - 实时性能监控
-
-## 🚀 部署到 Vercel
-
-### ✅ 404错误已修复
-
-**问题**: 之前使用了过时的 `@vercel/static` 构建器配置
-**解决**: 移除 `builds` 配置，Vercel自动检测静态网站
-
-### 部署方法
-
-**方法1: Vercel Dashboard (推荐)**
-1. 访问 https://vercel.com/new
-2. 导入GitHub仓库 `KazooProtoWeb-Alpha4`
-3. 设置:
-   - Framework: `Other`
-   - Root Directory: `./`
-   - Build Command: 留空
-   - Output Directory: `./`
-4. 点击 "Deploy"
-
-**方法2: Vercel CLI**
-```bash
-# 安装 Vercel CLI
-npm i -g vercel
-
-# 登录
-vercel login
-
-# 部署
-vercel --prod
-```
-
-### 验证部署
-
-运行验证脚本：
-```bash
-./verify-deployment.sh
-```
-
-详细部署指南和故障排除: [VERCEL_DEPLOYMENT_GUIDE.md](VERCEL_DEPLOYMENT_GUIDE.md)
-
-## 🌐 浏览器兼容性
-
-- Chrome 88+ (推荐)
-- Edge 88+
-- Firefox 85+
-- Safari 14.1+
-
-**注意**: 需要 HTTPS 环境或 localhost 才能访问麦克风。
-
-## 📂 项目文件
-
-### 核心文件清单
-- ✅ `index.html` - 主页面 (现代化UI)
-- ✅ `vercel.json` - Vercel配置 (已修复404)
-- ✅ `css/styles.css` - Apple风格设计
-- ✅ `js/main.js` - 主控制器
-- ✅ `js/calibration.js` - 校准系统 (修复自动进入Step 2)
-- ✅ `js/synthesizer.js` - 音色合成 (修复Chrome autoplay)
-- ✅ `js/lib/tone.js` - Tone.js库 (345KB)
-- ✅ `js/lib/pitchfinder-browser.js` - YIN算法
-
-### 文档
-- 📖 `README.md` - 项目说明 (本文件)
-- 📖 `VERCEL_DEPLOYMENT_GUIDE.md` - 详细部署指南
-- 📖 `QUICKSTART.md` - 快速入门教程
-- 📖 `DEPLOYMENT.md` - 部署步骤
-
-## 🔧 最近更新
-
-### v1.1 (2025-10-30)
-- ✅ **修复Vercel 404错误** - 移除过时的builds配置
-- ✅ **修复校准系统** - 自动5秒后进入Step 2
-- ✅ **修复Chrome autoplay** - 正确处理AudioContext状态
-- ✅ **UI全面升级** - Apple风格、动画、引导文本
-- ✅ **添加部署工具** - 验证脚本和详细文档
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 开源协议
-
-MIT License
-
-## 👨‍💻 作者
-
-Ziming Wang
-
-## 🙏 致谢
-
-- [Tone.js](https://tonejs.github.io/) - 优秀的Web音频框架
-- [Pitchfinder](https://github.com/peterkhayes/pitchfinder) - YIN算法实现
-- [Vercel](https://vercel.com/) - 免费托管平台
+MIT
 
 ---
 
-**实时低延迟音频处理技术演示**
+**Enjoy transforming your voice!** 🎤🎵

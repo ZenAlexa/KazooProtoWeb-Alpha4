@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tone.js Test</title>
+</head>
+<body>
+    <h1>Tone.js Audio Test</h1>
+    <button id="testBtn">Test Sound</button>
+    <div id="log"></div>
+
+    <script src="js/lib/tone.js"></script>
+    <script>
+        const log = document.getElementById('log');
+        const btn = document.getElementById('testBtn');
+
+        btn.addEventListener('click', async () => {
+            log.innerHTML += '<p>Starting test...</p>';
+
+            try {
+                // 启动 Tone.js
+                await Tone.start();
+                log.innerHTML += '<p>✓ Tone.js started</p>';
+
+                // 创建简单合成器
+                const synth = new Tone.Synth().toDestination();
+                log.innerHTML += '<p>✓ Synth created and connected</p>';
+
+                // 播放音符
+                synth.triggerAttackRelease('C4', '0.5');
+                log.innerHTML += '<p>✓ Note triggered</p>';
+
+                log.innerHTML += '<p style="color: green;"><strong>Should hear sound now!</strong></p>';
+            } catch (error) {
+                log.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -74,29 +74,11 @@ class SynthesizerEngine {
     }
 
     /**
-     * 创建效果器链
+     * 创建效果器链 - 暂时禁用，直接输出
      */
     createEffects() {
-        // 混响
-        this.reverb = new Tone.Reverb({
-            decay: 2,
-            wet: 0.2
-        }).toDestination();
-
-        // 颤音
-        this.vibrato = new Tone.Vibrato({
-            frequency: 5,
-            depth: 0.1
-        });
-
-        // 滤波器（控制音色亮度）
-        this.filter = new Tone.Filter({
-            frequency: 2000,
-            type: 'lowpass',
-            rolloff: -24
-        });
-
-        console.log('Effects chain created');
+        // 暂时不使用效果器，直接连接合成器到destination
+        console.log('Effects bypassed - direct output');
     }
 
     /**
@@ -210,13 +192,11 @@ class SynthesizerEngine {
                 this.currentSynth = new Tone.Synth();
         }
 
-        // 连接效果器链
-        this.currentSynth.connect(this.vibrato);
-        this.vibrato.connect(this.filter);
-        this.filter.connect(this.reverb);
+        // 直接连接到destination（最简单）
+        this.currentSynth.toDestination();
 
         this.currentInstrument = instrument;
-        console.log(`Synthesizer created: ${instrument}`);
+        console.log(`✓ ${instrument} → destination`);
     }
 
     /**
@@ -239,8 +219,8 @@ class SynthesizerEngine {
 
         const fullNote = `${note}${octave}`;
 
-        // 更新表现力参数
-        this.updateExpressiveness(pitchInfo);
+        // 暂时禁用表现力更新（简化调试）
+        // this.updateExpressiveness(pitchInfo);
 
         // 如果未播放，启动声音
         if (!this.isPlaying) {
@@ -283,13 +263,17 @@ class SynthesizerEngine {
             const velocity = Math.min(Math.max(volume * 2, 0.1), 1);
 
             console.log(`[Synth] 🎵 Playing: ${note} @ ${frequency.toFixed(1)}Hz, vel=${velocity.toFixed(2)}`);
+            console.log(`  Synth status: exists=${!!this.currentSynth}, connected=${!!this.currentSynth._volume}`);
+            console.log(`  Tone.context: ${Tone.context.state}, destination: ${!!Tone.Destination}`);
 
             // 对于弹拨类乐器使用triggerAttackRelease
             if (this.currentInstrument === 'guitar' || this.currentInstrument === 'piano') {
                 this.currentSynth.triggerAttackRelease(note, '0.5', now, velocity);
+                console.log(`  → triggerAttackRelease called`);
             } else {
                 // 对于持续类乐器使用triggerAttack
                 this.currentSynth.triggerAttack(note, now, velocity);
+                console.log(`  → triggerAttack called`);
             }
 
             this.isPlaying = true;

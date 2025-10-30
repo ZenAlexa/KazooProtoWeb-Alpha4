@@ -177,28 +177,38 @@ class PitchDetector {
      * @returns {number} 置信度 (0-1)
      */
     calculateConfidence(audioBuffer, frequency) {
-        // 简化的置信度计算
-        // 基于音频信号的清晰度和周期性
+        // 简化的置信度计算 - 基于信号强度
+        // YIN算法本身已经有内置的置信度（通过阈值判断）
+        // 这里我们主要基于音量来计算置信度
 
         if (!frequency || frequency <= 0) return 0;
 
-        // 计算自相关
-        const period = this.sampleRate / frequency;
-        const maxShift = Math.min(audioBuffer.length - Math.floor(period), Math.floor(period * 2));
+        // 计算 RMS (均方根) 音量
+        let sumSquares = 0;
+        for (let i = 0; i < audioBuffer.length; i++) {
+            sumSquares += audioBuffer[i] * audioBuffer[i];
+        }
+        const rms = Math.sqrt(sumSquares / audioBuffer.length);
 
-        if (maxShift < period) return 0;
+        // 将 RMS 映射到 0-1 置信度
+        // RMS 通常在 0-0.5 范围内，我们放大到 0-1
+        // 最小阈值：0.01 (非常小的声音)
+        // 最大阈值：0.3 (正常说话/唱歌音量)
+        const minRMS = 0.01;
+        const maxRMS = 0.3;
 
-        let correlation = 0;
-        const shift = Math.floor(period);
+        let confidence = (rms - minRMS) / (maxRMS - minRMS);
+        confidence = Math.max(0, Math.min(1, confidence)); // 限制在 0-1
 
-        for (let i = 0; i < audioBuffer.length - shift; i++) {
-            correlation += Math.abs(audioBuffer[i] * audioBuffer[i + shift]);
+        // 额外检查：如果频率在人声范围内 (80-800Hz)，提升置信度
+        if (frequency >= 80 && frequency <= 800) {
+            confidence = Math.min(confidence * 1.2, 1);
         }
 
-        correlation /= (audioBuffer.length - shift);
-
-        // 归一化到0-1范围
-        const confidence = Math.min(correlation * 10, 1);
+        // 调试日志 - 每10帧打印一次
+        if (Math.random() < 0.1) {
+            console.log(`[PitchDetector] RMS: ${rms.toFixed(4)}, Confidence: ${confidence.toFixed(2)}, Freq: ${frequency.toFixed(1)}Hz`);
+        }
 
         return confidence;
     }

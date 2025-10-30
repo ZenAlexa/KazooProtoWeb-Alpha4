@@ -1,10 +1,17 @@
 /**
  * 主控制器 - 无校准版本
  * 极简设计：选择乐器 → 开始播放
+ *
+ * Phase 1: 集成 AudioIO 低延迟音频抽象层
  */
 class KazooApp {
     constructor() {
         this.isRunning = false;
+
+        // Phase 1: 音频系统选择
+        // Feature Flag: 使用 AudioIO (支持 Worklet) 或 audioInputManager (Legacy)
+        this.useAudioIO = true;  // Phase 1: 启用 AudioIO 抽象层
+        this.audioIO = null;     // AudioIO 实例
 
         // Phase 2: 双引擎模式
         this.useContinuousMode = true;  // 默认使用新引擎
@@ -135,52 +142,18 @@ class KazooApp {
 
     /**
      * 开始播放
+     * Phase 1: 使用 AudioIO 或 audioInputManager
      */
     async start() {
         try {
             console.log(`Starting Kazoo Proto in ${this.useContinuousMode ? 'Continuous' : 'Legacy'} mode...`);
 
-            // 初始化音频系统
-            if (!audioInputManager.audioContext) {
-                console.log('Initializing audio input...');
-                await audioInputManager.initialize();
-            }
-
-            // Phase 2: 选择引擎
-            if (this.useContinuousMode) {
-                this.currentEngine = continuousSynthEngine;
-                console.log('Using Continuous Frequency Engine');
+            // Phase 1: 选择音频系统
+            if (this.useAudioIO) {
+                await this._startWithAudioIO();
             } else {
-                this.currentEngine = synthesizerEngine;
-                console.log('Using Legacy Note-Based Engine');
+                await this._startWithLegacyAudio();
             }
-
-            // 初始化选中的引擎
-            if (!this.currentEngine.currentSynth) {
-                console.log('Initializing synthesizer engine...');
-                await this.currentEngine.initialize();
-            }
-
-            // 初始化音高检测
-            if (!pitchDetector.detector) {
-                console.log('Initializing pitch detector...');
-                pitchDetector.initialize(audioInputManager.audioContext.sampleRate);
-            }
-
-            // 初始化性能监控
-            if (!performanceMonitor.metrics.sampleRate) {
-                await performanceMonitor.initialize(
-                    audioInputManager.audioContext,
-                    audioInputManager.config.bufferSize
-                );
-            }
-
-            // 启动麦克风
-            console.log('Starting microphone...');
-            await audioInputManager.startMicrophone();
-
-            // 设置音频处理回调
-            audioInputManager.onAudioProcess = this.onAudioProcess.bind(this);
 
             // 更新UI
             this.isRunning = true;
@@ -203,13 +176,127 @@ class KazooApp {
     }
 
     /**
+     * Phase 1: 使用 AudioIO 启动
+     */
+    async _startWithAudioIO() {
+        console.log('🚀 [Phase 1] 使用 AudioIO 抽象层');
+
+        // 1. 创建 AudioIO 实例
+        if (!this.audioIO) {
+            this.audioIO = new AudioIO();
+
+            // 配置 AudioIO
+            this.audioIO.configure({
+                useWorklet: false,          // Phase 1 默认 false (安全)
+                workletBufferSize: 128,     // 低延迟目标
+                bufferSize: 2048,           // ScriptProcessor 回退
+                workletFallback: true,      // 自动回退
+                sampleRate: 44100,
+                latencyHint: 'interactive',
+                debug: false
+            });
+
+            // 注册音高检测回调 (Worklet 模式)
+            this.audioIO.onPitchDetected((pitchInfo) => {
+                this.onPitchDetected(pitchInfo);
+            });
+
+            // 注册音频帧回调 (ScriptProcessor 模式)
+            this.audioIO.onFrame((audioBuffer) => {
+                this.onAudioProcess(audioBuffer);
+            });
+
+            // 错误处理
+            this.audioIO.onError((type, error) => {
+                console.error('[AudioIO Error]', type, error);
+            });
+        }
+
+        // 2. 初始化引擎
+        await this._initializeEngines(this.audioIO.audioContext || null);
+
+        // 3. 启动音频系统
+        const result = await this.audioIO.start();
+        console.log('🎵 AudioIO 已启动:', result);
+
+        // 4. 更新性能监控
+        const ctx = this.audioIO.audioContext;
+        const bufferSize = result.mode === 'worklet' ? 128 : 2048;
+
+        if (!performanceMonitor.metrics.sampleRate) {
+            await performanceMonitor.initialize(ctx, bufferSize, result.mode);
+        }
+    }
+
+    /**
+     * Phase 1: 使用 Legacy audioInputManager 启动
+     */
+    async _startWithLegacyAudio() {
+        console.log('🔄 [Legacy] 使用 audioInputManager');
+
+        // 初始化音频系统
+        if (!audioInputManager.audioContext) {
+            await audioInputManager.initialize();
+        }
+
+        // 初始化引擎
+        await this._initializeEngines(audioInputManager.audioContext);
+
+        // 启动麦克风
+        await audioInputManager.startMicrophone();
+
+        // 设置音频处理回调
+        audioInputManager.onAudioProcess = this.onAudioProcess.bind(this);
+
+        // 初始化性能监控
+        if (!performanceMonitor.metrics.sampleRate) {
+            await performanceMonitor.initialize(
+                audioInputManager.audioContext,
+                audioInputManager.config.bufferSize,
+                'script-processor'
+            );
+        }
+    }
+
+    /**
+     * 初始化合成器引擎和音高检测器
+     */
+    async _initializeEngines(audioContext) {
+        // 选择引擎
+        if (this.useContinuousMode) {
+            this.currentEngine = continuousSynthEngine;
+            console.log('Using Continuous Frequency Engine');
+        } else {
+            this.currentEngine = synthesizerEngine;
+            console.log('Using Legacy Note-Based Engine');
+        }
+
+        // 初始化选中的引擎
+        if (!this.currentEngine.currentSynth) {
+            console.log('Initializing synthesizer engine...');
+            await this.currentEngine.initialize();
+        }
+
+        // 初始化音高检测 (ScriptProcessor 模式需要)
+        if (audioContext && !pitchDetector.detector) {
+            console.log('Initializing pitch detector...');
+            pitchDetector.initialize(audioContext.sampleRate);
+        }
+    }
+
+    /**
      * 停止播放
+     * Phase 1: 支持 AudioIO 和 audioInputManager
      */
     stop() {
         this.isRunning = false;
 
-        // 停止音频
-        audioInputManager.stop();
+        // Phase 1: 停止音频系统
+        if (this.useAudioIO && this.audioIO) {
+            this.audioIO.stop();
+        } else {
+            audioInputManager.stop();
+        }
 
         // Phase 2: 停止当前引擎
         if (this.currentEngine) {
@@ -229,6 +316,36 @@ class KazooApp {
         this.ui.recordingHelper.textContent = 'No setup required • Works in your browser';
 
         console.log('Kazoo Proto stopped');
+    }
+
+    /**
+     * Phase 1: 处理来自 AudioWorklet 的音高检测结果
+     * 直接使用检测结果,无需再次调用 pitchDetector
+     */
+    onPitchDetected(pitchInfo) {
+        if (!this.isRunning || !this.currentEngine) return;
+
+        // 性能监控开始
+        performanceMonitor.startProcessing();
+
+        // 更新显示
+        this.ui.currentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
+        this.ui.currentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
+        this.ui.confidence.textContent = `${Math.round(pitchInfo.confidence * 100)}%`;
+
+        // 驱动当前引擎发声
+        this.currentEngine.processPitch(pitchInfo);
+
+        // 可视化
+        this.updateVisualizer(pitchInfo);
+
+        // 性能监控结束
+        performanceMonitor.endProcessing();
+
+        // 更新性能指标
+        performanceMonitor.updateFPS();
+        const metrics = performanceMonitor.getMetrics();
+        this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
     /**

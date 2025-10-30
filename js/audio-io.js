@@ -36,7 +36,8 @@ class AudioIO {
         };
 
         // 回调函数
-        this.onFrameCallback = null;
+        this.onFrameCallback = null;           // 原始音频帧回调 (所有模式)
+        this.onPitchDetectedCallback = null;   // 音高检测回调 (仅 Worklet 模式)
         this.onErrorCallback = null;
         this.onStateChangeCallback = null;
 
@@ -180,7 +181,7 @@ class AudioIO {
     }
 
     /**
-     * 注册音频帧回调
+     * 注册音频帧回调 (原始音频数据)
      * @param {Function} callback - (audioBuffer: Float32Array, timestamp: number) => void
      */
     onFrame(callback) {
@@ -189,6 +190,19 @@ class AudioIO {
         }
         this.onFrameCallback = callback;
         console.log('[AudioIO] 已注册音频帧回调');
+        return this;
+    }
+
+    /**
+     * 注册音高检测回调 (仅 Worklet 模式)
+     * @param {Function} callback - (pitchInfo: Object) => void
+     */
+    onPitchDetected(callback) {
+        if (typeof callback !== 'function') {
+            throw new TypeError('[AudioIO] onPitchDetected callback must be a function');
+        }
+        this.onPitchDetectedCallback = callback;
+        console.log('[AudioIO] 已注册音高检测回调');
         return this;
     }
 
@@ -410,9 +424,17 @@ class AudioIO {
                 break;
 
             case 'pitch-detected':
-                // Phase 2: 传递音高检测结果
-                if (this.onFrameCallback) {
-                    this.onFrameCallback(data, data.timestamp);
+                // 传递音高检测结果到专用回调
+                if (this.onPitchDetectedCallback) {
+                    this.onPitchDetectedCallback(data);
+                }
+                this.stats.pitchDetections = (this.stats.pitchDetections || 0) + 1;
+                break;
+
+            case 'no-pitch':
+                // 未检测到音高 (可选处理)
+                if (this.config.debug && data) {
+                    console.log('[AudioIO] 未检测到音高, 音量:', data.volume);
                 }
                 break;
 

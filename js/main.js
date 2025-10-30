@@ -198,10 +198,9 @@ class KazooApp {
             this.updateVisualizer(pitchInfo);
 
             // 更新性能监控
-            const latency = performanceMonitor.recordFrame();
-            if (latency !== null) {
-                this.ui.latency.textContent = `${latency.toFixed(1)}ms`;
-            }
+            performanceMonitor.updateFPS();
+            const metrics = performanceMonitor.getMetrics();
+            this.ui.latency.textContent = `${metrics.totalLatency}ms`;
         } else {
             // 没有音高，停止发声
             synthesizerEngine.stopNote();

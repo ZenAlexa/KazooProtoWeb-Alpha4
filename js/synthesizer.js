@@ -23,8 +23,8 @@ class SynthesizerEngine {
             volume: 0
         };
 
-        // 音符触发阈值
-        this.minConfidence = 0.6;
+        // 音符触发阈值（降低以便更容易触发声音）
+        this.minConfidence = 0.3;
     }
 
     /**

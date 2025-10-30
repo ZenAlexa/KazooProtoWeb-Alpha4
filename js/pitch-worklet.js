@@ -1,19 +1,23 @@
 /**
  * AudioWorklet Pitch Detector Processor
  *
- * Phase 1.6: 空处理器实现
- * - 验证 AudioWorklet 加载机制
- * - 测试主线程通信
- * - 透传音频数据 (无实际处理)
+ * Phase 1 完成版: 集成 YIN 音高检测算法
+ * - 在 AudioWorklet 线程中运行 YIN 算法
+ * - 实时音高检测和平滑处理
+ * - 完整的音符信息计算
+ * - 与 pitch-detector.js API 兼容
  *
- * Phase 2: 集成 YIN/MPM 算法
+ * 性能目标:
+ * - Buffer: 128 samples (2.9ms @ 44.1kHz)
+ * - 处理时间: < 1ms per frame
+ * - 总延迟: 8-15ms (vs. 46ms ScriptProcessor)
  */
 
 class PitchDetectorWorklet extends AudioWorkletProcessor {
     constructor(options) {
         super();
 
-        console.log('[PitchWorklet] 🎵 Worklet 处理器已创建');
+        console.log('[PitchWorklet] 🎵 Worklet 处理器已创建 - Phase 1 完整版');
 
         // 配置参数 (从主线程接收)
         this.config = {
@@ -26,12 +30,24 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
             minVolumeThreshold: 0.01
         };
 
-        // 音高检测器 (Phase 2 实现)
-        this.detector = null;
+        // 初始化 YIN 检测器
+        this.detector = this._createYINDetector(this.config);
+
+        // 音高历史记录 (用于平滑)
+        this.pitchHistory = [];
+
+        // 音符映射表
+        this.noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // 音频累积缓冲 (YIN需要更大的窗口)
+        this.accumulationBuffer = new Float32Array(2048); // YIN 推荐至少 2048
+        this.accumulationIndex = 0;
+        this.accumulationFull = false;
 
         // 性能统计
         this.stats = {
             framesProcessed: 0,
+            pitchDetections: 0,
             startTime: currentTime,
             lastReportTime: currentTime,
             processingTimes: [],
@@ -44,8 +60,96 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         // 通知主线程已就绪
         this.port.postMessage({
             type: 'ready',
-            sampleRate: this.config.sampleRate
+            sampleRate: this.config.sampleRate,
+            bufferSize: 128,
+            algorithm: 'YIN'
         });
+
+        console.log('[PitchWorklet] ✅ YIN 检测器初始化完成');
+    }
+
+    /**
+     * 创建 YIN 音高检测器
+     * 基于 Pitchfinder 库的 YIN 实现
+     */
+    _createYINDetector(config) {
+        const threshold = config.threshold || 0.1;
+        const probabilityThreshold = 0.1;
+        const sampleRate = config.sampleRate;
+
+        return function detectPitch(buffer) {
+            if (!buffer || buffer.length < 2) {
+                return null;
+            }
+
+            const yinBufferSize = Math.floor(buffer.length / 2);
+            const yinBuffer = new Float32Array(yinBufferSize);
+
+            // Step 1: 计算差分函数
+            let delta;
+            for (let t = 0; t < yinBufferSize; t++) {
+                yinBuffer[t] = 0;
+            }
+
+            for (let t = 1; t < yinBufferSize; t++) {
+                for (let i = 0; i < yinBufferSize; i++) {
+                    delta = buffer[i] - buffer[i + t];
+                    yinBuffer[t] += delta * delta;
+                }
+            }
+
+            // Step 2: 计算累积平均归一化差分
+            yinBuffer[0] = 1;
+            let runningSum = 0;
+            for (let t = 1; t < yinBufferSize; t++) {
+                runningSum += yinBuffer[t];
+                yinBuffer[t] *= t / runningSum;
+            }
+
+            // Step 3: 绝对阈值
+            let tau = -1;
+            for (let t = 2; t < yinBufferSize; t++) {
+                if (yinBuffer[t] < threshold) {
+                    while (t + 1 < yinBufferSize && yinBuffer[t + 1] < yinBuffer[t]) {
+                        t++;
+                    }
+                    tau = t;
+                    break;
+                }
+            }
+
+            // Step 4: 未检测到音高
+            if (tau === -1) {
+                return null;
+            }
+
+            // Step 5: 抛物线插值
+            let betterTau;
+            const x0 = (tau < 1) ? tau : tau - 1;
+            const x2 = (tau + 1 < yinBufferSize) ? tau + 1 : tau;
+
+            if (x0 === tau) {
+                betterTau = (yinBuffer[tau] <= yinBuffer[x2]) ? tau : x2;
+            } else if (x2 === tau) {
+                betterTau = (yinBuffer[tau] <= yinBuffer[x0]) ? tau : x0;
+            } else {
+                const s0 = yinBuffer[x0];
+                const s1 = yinBuffer[tau];
+                const s2 = yinBuffer[x2];
+                betterTau = tau + (s2 - s0) / (2 * (2 * s1 - s2 - s0));
+            }
+
+            // 计算频率
+            const frequency = sampleRate / betterTau;
+
+            // 检查概率
+            const probability = 1 - yinBuffer[tau];
+            if (probability < probabilityThreshold) {
+                return null;
+            }
+
+            return frequency;
+        };
     }
 
     /**
@@ -64,25 +168,79 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         const audioBuffer = input[0]; // Float32Array[128]
 
         try {
-            // Phase 1.6: 空处理，仅透传数据并计算音量
+            // 计算音量
             const volume = this._calculateRMS(audioBuffer);
 
-            // Phase 2: 将在此处调用音高检测
-            // const frequency = this.detector.detect(audioBuffer);
+            // 累积音频数据到更大的缓冲区 (YIN 需要至少 2048 samples)
+            this._accumulateAudio(audioBuffer);
 
-            // 发送测试消息 (每秒一次，避免消息泛滥)
-            if (this.stats.framesProcessed % 344 === 0) {
-                this.port.postMessage({
-                    type: 'test-ping',
-                    data: {
-                        framesProcessed: this.stats.framesProcessed,
-                        volume: volume.toFixed(4),
-                        avgProcessingTime: this._getAvgProcessingTime()
+            let pitchInfo = null;
+
+            // 当缓冲区满时,执行音高检测
+            if (this.accumulationFull) {
+                // 检查音量阈值
+                if (volume >= this.config.minVolumeThreshold) {
+                    const frequency = this.detector(this.accumulationBuffer);
+
+                    if (frequency && frequency > 0 && frequency < 2000) {
+                        // 频率范围检查
+                        if (frequency >= this.config.minFrequency &&
+                            frequency <= this.config.maxFrequency) {
+
+                            // 添加到历史记录
+                            this.pitchHistory.push(frequency);
+                            if (this.pitchHistory.length > this.config.smoothingSize) {
+                                this.pitchHistory.shift();
+                            }
+
+                            // 计算平滑后的频率
+                            const smoothedFrequency = this._getSmoothedPitch();
+
+                            // 转换为音符信息
+                            const noteInfo = this._frequencyToNote(smoothedFrequency);
+
+                            // 计算置信度
+                            const confidence = this._calculateConfidence(
+                                this.accumulationBuffer,
+                                frequency,
+                                volume
+                            );
+
+                            pitchInfo = {
+                                frequency: smoothedFrequency,
+                                rawFrequency: frequency,
+                                note: noteInfo.note,
+                                octave: noteInfo.octave,
+                                cents: noteInfo.cents,
+                                confidence: confidence,
+                                volume: volume
+                            };
+
+                            this.stats.pitchDetections++;
+
+                            // 发送音高检测结果到主线程
+                            this.port.postMessage({
+                                type: 'pitch-detected',
+                                data: pitchInfo
+                            });
+                        }
+                    } else if (frequency === null) {
+                        // 未检测到音高
+                        this.port.postMessage({
+                            type: 'no-pitch',
+                            data: { volume: volume }
+                        });
                     }
-                });
+                }
+
+                // 重置缓冲区 (滑动窗口: 保留后半部分)
+                const halfSize = Math.floor(this.accumulationBuffer.length / 2);
+                this.accumulationBuffer.copyWithin(0, halfSize);
+                this.accumulationIndex = halfSize;
+                this.accumulationFull = false;
             }
 
-            // Phase 1.6: 透传音频数据 (输出 = 输入)
+            // 透传音频数据 (输出 = 输入)
             const output = outputs[0];
             if (output && output[0]) {
                 output[0].set(audioBuffer);
@@ -184,6 +342,89 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
             default:
                 console.warn('[PitchWorklet] 未知控制命令:', command);
         }
+    }
+
+    /**
+     * 累积音频到更大的缓冲区
+     */
+    _accumulateAudio(newSamples) {
+        const remaining = this.accumulationBuffer.length - this.accumulationIndex;
+        const copySize = Math.min(newSamples.length, remaining);
+
+        this.accumulationBuffer.set(
+            newSamples.subarray(0, copySize),
+            this.accumulationIndex
+        );
+
+        this.accumulationIndex += copySize;
+
+        if (this.accumulationIndex >= this.accumulationBuffer.length) {
+            this.accumulationFull = true;
+        }
+    }
+
+    /**
+     * 获取平滑后的音高 (中值滤波)
+     */
+    _getSmoothedPitch() {
+        if (this.pitchHistory.length === 0) return 0;
+
+        const sorted = [...this.pitchHistory].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+
+        if (sorted.length % 2 === 0) {
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+            return sorted[mid];
+        }
+    }
+
+    /**
+     * 将频率转换为音符信息
+     */
+    _frequencyToNote(frequency) {
+        // A4 = 440 Hz 为参考
+        const A4 = 440;
+        const C0 = A4 * Math.pow(2, -4.75); // C0 frequency
+
+        // 计算与C0的半音差
+        const halfSteps = 12 * Math.log2(frequency / C0);
+        const roundedHalfSteps = Math.round(halfSteps);
+
+        // 计算音符和八度
+        const noteIndex = roundedHalfSteps % 12;
+        const octave = Math.floor(roundedHalfSteps / 12);
+
+        // 计算音分偏差 (cents)
+        const cents = Math.round((halfSteps - roundedHalfSteps) * 100);
+
+        return {
+            note: this.noteNames[noteIndex],
+            octave: octave,
+            fullNote: `${this.noteNames[noteIndex]}${octave}`,
+            cents: cents
+        };
+    }
+
+    /**
+     * 计算检测置信度
+     */
+    _calculateConfidence(audioBuffer, frequency, volume) {
+        if (!frequency || frequency <= 0) return 0;
+
+        // 基于音量的置信度
+        const minRMS = 0.01;
+        const maxRMS = 0.3;
+
+        let confidence = (volume - minRMS) / (maxRMS - minRMS);
+        confidence = Math.max(0, Math.min(1, confidence));
+
+        // 频率在人声范围内 (80-800Hz)，提升置信度
+        if (frequency >= 80 && frequency <= 800) {
+            confidence = Math.min(confidence * 1.2, 1);
+        }
+
+        return confidence;
     }
 
     /**

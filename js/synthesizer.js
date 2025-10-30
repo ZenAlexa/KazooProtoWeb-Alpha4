@@ -32,8 +32,14 @@ class SynthesizerEngine {
      */
     async initialize() {
         try {
+            // 重要: 检查AudioContext状态并在用户手势后恢复
+            // Chrome的自动播放策略要求AudioContext必须在用户手势后启动
+            if (Tone.context.state !== 'running') {
+                await Tone.start();
+                console.log('Tone.js AudioContext resumed after user gesture');
+            }
+
             // 配置Tone.js为低延迟模式
-            await Tone.start();
             Tone.context.lookAhead = 0.01; // 10ms预见时间
 
             console.log('Tone.js initialized:', {

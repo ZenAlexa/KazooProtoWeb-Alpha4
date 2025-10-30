@@ -93,6 +93,11 @@ class CalibrationSystem {
                     remaining: Math.max(0, this.sampleDuration - elapsed)
                 });
             }
+
+            // 关键修复：在计时器中检查是否达到时间，自动进入下一步
+            if (elapsed >= this.sampleDuration) {
+                this.completeCurrentStep();
+            }
         }, 50); // 每50ms更新一次
     }
 
@@ -123,29 +128,7 @@ class CalibrationSystem {
             });
         }
 
-        // 计算进度
-        const elapsed = Date.now() - this.sampleStartTime;
-        const progress = Math.min((elapsed / this.sampleDuration) * 100, 100);
-
-        // 更新UI
-        if (this.onCalibrationUpdate) {
-            const instruction = this.calibrationStep === 1 ?
-                '请唱出你能唱的最低音，并保持...' :
-                '请唱出你能唱的最高音，并保持...';
-
-            this.onCalibrationUpdate({
-                step: this.calibrationStep,
-                instruction: instruction,
-                progress: progress,
-                currentFreq: frequency,
-                currentNote: `${note}${octave}`
-            });
-        }
-
-        // 检查是否完成当前步骤
-        if (elapsed >= this.sampleDuration) {
-            this.completeCurrentStep();
-        }
+        // 注意：不在这里检查时间，由计时器自动触发步骤完成
     }
 
     /**

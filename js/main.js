@@ -17,10 +17,20 @@ class KazooApp {
             warningBox: document.getElementById('warningBox'),
             warningText: document.getElementById('warningText'),
 
+            // 状态徽章
+            calibrationStatus: document.getElementById('calibrationStatus'),
+            instrumentStatus: document.getElementById('instrumentStatus'),
+            recordingStatus: document.getElementById('recordingStatus'),
+            recordingHelper: document.getElementById('recordingHelper'),
+
             // 模态弹窗
             calibrationModal: document.getElementById('calibrationModal'),
+            modalStepIcon: document.getElementById('modalStepIcon'),
             modalTitle: document.getElementById('modalTitle'),
             modalDescription: document.getElementById('modalDescription'),
+            modalTip: document.getElementById('modalTip'),
+            stepDot1: document.getElementById('stepDot1'),
+            stepDot2: document.getElementById('stepDot2'),
             progressFill: document.getElementById('progressFill'),
             progressText: document.getElementById('progressText'),
             modalCurrentNote: document.getElementById('modalCurrentNote'),
@@ -97,6 +107,11 @@ class KazooApp {
                 this.ui.instrumentBtns.forEach(b => b.classList.remove('active'));
                 e.currentTarget.classList.add('active');
                 const instrument = e.currentTarget.dataset.instrument;
+
+                // 更新状态徽章
+                const instrumentName = e.currentTarget.querySelector('.instrument-name').textContent;
+                this.ui.instrumentStatus.textContent = instrumentName;
+
                 if (synthesizerEngine.currentSynth) {
                     synthesizerEngine.changeInstrument(instrument);
                 }
@@ -193,10 +208,19 @@ class KazooApp {
             this.ui.progressText.textContent = `${elapsedSec} / 5.0 seconds`;
         }
 
+        // 更新步骤指示器和图标
         if (step === 1) {
             this.ui.modalTitle.textContent = 'Calibration - Step 1 of 2';
+            this.ui.modalStepIcon.textContent = '🎤';
+            this.ui.modalTip.textContent = '💡 Tip: Use a steady, comfortable volume. Don\'t strain!';
+            this.ui.stepDot1.classList.add('active');
+            this.ui.stepDot2.classList.remove('active');
         } else if (step === 2) {
             this.ui.modalTitle.textContent = 'Calibration - Step 2 of 2';
+            this.ui.modalStepIcon.textContent = '🎵';
+            this.ui.modalTip.textContent = '💡 Tip: Go as high as comfortable. This defines your upper range!';
+            this.ui.stepDot1.classList.remove('active');
+            this.ui.stepDot2.classList.add('active');
         }
     }
 
@@ -214,8 +238,12 @@ class KazooApp {
 
         // 更新UI状态
         this.isCalibrated = true;
-        this.ui.calibrateBtn.textContent = 'Recalibrate Voice';
+        this.ui.calibrateBtn.textContent = '✓ Recalibrate';
+        this.ui.calibrateBtn.classList.remove('pulse');
+        this.ui.calibrationStatus.textContent = `${lowestNote} - ${highestNote}`;
+        this.ui.calibrationStatus.classList.add('status-ready');
         this.ui.startBtn.classList.remove('hidden');
+        this.ui.recordingHelper.textContent = 'Ready to record!';
 
         console.log('Calibration complete:', data);
 
@@ -228,9 +256,9 @@ Range: ${range.semitones} semitones (${range.octaves.toFixed(1)} octaves)
 The system now knows your voice range and will accurately convert your humming to instrument notes within this range.
 
 Next steps:
-1. Choose an instrument below
+1. Choose an instrument below (Saxophone is selected by default)
 2. Click "Start Recording"
-3. Hum or sing - you'll hear it as the chosen instrument!`);
+3. Hum or sing - you'll hear it as the chosen instrument in real-time!`);
     }
 
     /**

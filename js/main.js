@@ -1,14 +1,13 @@
 /**
- * 主控制器 - Apple风格重构版
+ * 主控制器 - 无校准版本
+ * 极简设计：选择乐器 → 开始播放
  */
 class KazooApp {
     constructor() {
-        this.isCalibrated = false;
         this.isRunning = false;
 
         // UI元素
         this.ui = {
-            calibrateBtn: document.getElementById('calibrateBtn'),
             startBtn: document.getElementById('startBtn'),
             stopBtn: document.getElementById('stopBtn'),
             helpBtn: document.getElementById('helpBtn'),
@@ -18,24 +17,9 @@ class KazooApp {
             warningText: document.getElementById('warningText'),
 
             // 状态徽章
-            calibrationStatus: document.getElementById('calibrationStatus'),
             instrumentStatus: document.getElementById('instrumentStatus'),
             recordingStatus: document.getElementById('recordingStatus'),
             recordingHelper: document.getElementById('recordingHelper'),
-
-            // 模态弹窗
-            calibrationModal: document.getElementById('calibrationModal'),
-            modalStepIcon: document.getElementById('modalStepIcon'),
-            modalTitle: document.getElementById('modalTitle'),
-            modalDescription: document.getElementById('modalDescription'),
-            modalTip: document.getElementById('modalTip'),
-            stepDot1: document.getElementById('stepDot1'),
-            stepDot2: document.getElementById('stepDot2'),
-            progressFill: document.getElementById('progressFill'),
-            progressText: document.getElementById('progressText'),
-            modalCurrentNote: document.getElementById('modalCurrentNote'),
-            modalCurrentFreq: document.getElementById('modalCurrentFreq'),
-            cancelCalibrationBtn: document.getElementById('cancelCalibrationBtn'),
 
             // 状态和可视化
             statusBar: document.getElementById('statusBar'),
@@ -59,7 +43,7 @@ class KazooApp {
      * 初始化应用
      */
     async initialize() {
-        console.log('Initializing Kazoo App...');
+        console.log('Initializing Kazoo App (No-Calibration Version)...');
 
         // 检查兼容性
         this.checkCompatibility();
@@ -67,14 +51,10 @@ class KazooApp {
         // 绑定事件
         this.bindEvents();
 
-        // 设置校准回调
-        calibrationSystem.onCalibrationUpdate = this.onCalibrationUpdate.bind(this);
-        calibrationSystem.onCalibrationComplete = this.onCalibrationComplete.bind(this);
-
         // 初始化可视化
         this.initVisualizer();
 
-        console.log('App initialized');
+        console.log('App initialized - Ready to play!');
     }
 
     /**
@@ -93,10 +73,6 @@ class KazooApp {
      * 绑定事件
      */
     bindEvents() {
-        // 校准按钮
-        this.ui.calibrateBtn.addEventListener('click', () => this.startCalibration());
-        this.ui.cancelCalibrationBtn.addEventListener('click', () => this.cancelCalibration());
-
         // 开始/停止
         this.ui.startBtn.addEventListener('click', () => this.start());
         this.ui.stopBtn.addEventListener('click', () => this.stop());
@@ -112,6 +88,7 @@ class KazooApp {
                 const instrumentName = e.currentTarget.querySelector('.instrument-name').textContent;
                 this.ui.instrumentStatus.textContent = instrumentName;
 
+                // 如果合成器已初始化，切换乐器
                 if (synthesizerEngine.currentSynth) {
                     synthesizerEngine.changeInstrument(instrument);
                 }
@@ -129,161 +106,36 @@ class KazooApp {
     }
 
     /**
-     * 开始校准
+     * 开始播放
      */
-    async startCalibration() {
+    async start() {
         try {
+            console.log('Starting Kazoo Proto...');
+
             // 初始化音频系统
             if (!audioInputManager.audioContext) {
+                console.log('Initializing audio input...');
                 await audioInputManager.initialize();
             }
 
-            // 初始化合成器（用于稍后播放）
+            // 初始化合成器
             if (!synthesizerEngine.currentSynth) {
+                console.log('Initializing synthesizer...');
                 await synthesizerEngine.initialize();
             }
 
             // 初始化音高检测
             if (!pitchDetector.detector) {
+                console.log('Initializing pitch detector...');
                 pitchDetector.initialize(audioInputManager.audioContext.sampleRate);
             }
 
             // 启动麦克风
+            console.log('Starting microphone...');
             await audioInputManager.startMicrophone();
 
-            // 设置音频处理为校准模式
-            audioInputManager.onAudioProcess = this.onCalibrationAudioProcess.bind(this);
-
-            // 显示模态弹窗
-            this.ui.calibrationModal.classList.add('show');
-
-            // 开始校准
-            calibrationSystem.start();
-
-        } catch (error) {
-            console.error('Failed to start calibration:', error);
-            alert('Calibration failed: ' + error.message);
-        }
-    }
-
-    /**
-     * 取消校准
-     */
-    cancelCalibration() {
-        calibrationSystem.cancel();
-        audioInputManager.stop();
-        this.ui.calibrationModal.classList.remove('show');
-    }
-
-    /**
-     * 校准音频处理
-     */
-    onCalibrationAudioProcess(audioBuffer) {
-        const volume = audioInputManager.getVolume(audioBuffer);
-        const pitchInfo = pitchDetector.detect(audioBuffer, volume);
-
-        if (pitchInfo) {
-            calibrationSystem.processPitch(pitchInfo);
-
-            // 更新模态弹窗中的音符显示
-            this.ui.modalCurrentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
-            this.ui.modalCurrentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
-        }
-    }
-
-    /**
-     * 校准更新回调
-     */
-    onCalibrationUpdate(data) {
-        const { step, instruction, progress, elapsed } = data;
-
-        if (instruction) {
-            this.ui.modalDescription.textContent = instruction;
-        }
-
-        this.ui.progressFill.style.width = progress + '%';
-
-        if (elapsed !== undefined) {
-            const elapsedSec = (elapsed / 1000).toFixed(1);
-            this.ui.progressText.textContent = `${elapsedSec} / 5.0 seconds`;
-        }
-
-        // 更新步骤指示器和图标
-        if (step === 1) {
-            this.ui.modalTitle.textContent = 'Calibration - Step 1 of 2';
-            this.ui.modalStepIcon.textContent = '🎤';
-            this.ui.modalTip.textContent = '💡 Tip: Use a steady, comfortable volume. Don\'t strain!';
-            this.ui.stepDot1.classList.add('active');
-            this.ui.stepDot2.classList.remove('active');
-        } else if (step === 2) {
-            this.ui.modalTitle.textContent = 'Calibration - Step 2 of 2';
-            this.ui.modalStepIcon.textContent = '🎵';
-            this.ui.modalTip.textContent = '💡 Tip: Go as high as comfortable. This defines your upper range!';
-            this.ui.stepDot1.classList.remove('active');
-            this.ui.stepDot2.classList.add('active');
-        }
-    }
-
-    /**
-     * 校准完成回调
-     */
-    onCalibrationComplete(data) {
-        const { lowestNote, highestNote, range } = data;
-
-        // 关闭模态弹窗
-        this.ui.calibrationModal.classList.remove('show');
-
-        // 停止麦克风
-        audioInputManager.stop();
-
-        // 更新UI状态
-        this.isCalibrated = true;
-        this.ui.calibrateBtn.textContent = '✓ Recalibrate';
-        this.ui.calibrateBtn.classList.remove('pulse');
-        this.ui.calibrationStatus.textContent = `${lowestNote} - ${highestNote}`;
-        this.ui.calibrationStatus.classList.add('status-ready');
-        this.ui.startBtn.classList.remove('hidden');
-        this.ui.recordingHelper.textContent = 'Ready to record!';
-
-        console.log('Calibration complete:', data);
-
-        // 显示完成信息和下一步指引
-        alert(`✓ Calibration Complete!
-
-Your vocal range: ${lowestNote} - ${highestNote}
-Range: ${range.semitones} semitones (${range.octaves.toFixed(1)} octaves)
-
-The system now knows your voice range and will accurately convert your humming to instrument notes within this range.
-
-Next steps:
-1. Choose an instrument below (Saxophone is selected by default)
-2. Click "Start Recording"
-3. Hum or sing - you'll hear it as the chosen instrument in real-time!`);
-    }
-
-    /**
-     * 开始录音
-     */
-    async start() {
-        try {
-            // 确保音频系统已初始化
-            if (!audioInputManager.audioContext) {
-                await audioInputManager.initialize();
-            }
-
-            if (!synthesizerEngine.currentSynth) {
-                await synthesizerEngine.initialize();
-            }
-
-            if (!pitchDetector.detector) {
-                pitchDetector.initialize(audioInputManager.audioContext.sampleRate);
-            }
-
-            // 启动麦克风
-            await audioInputManager.startMicrophone();
-
-            // 设置音频处理为播放模式
-            audioInputManager.onAudioProcess = this.onPlaybackAudioProcess.bind(this);
+            // 设置音频处理回调
+            audioInputManager.onAudioProcess = this.onAudioProcess.bind(this);
 
             // 更新UI
             this.isRunning = true;
@@ -293,17 +145,20 @@ Next steps:
             this.ui.visualizer.classList.remove('hidden');
             this.ui.systemStatus.textContent = 'Running';
             this.ui.systemStatus.classList.add('active');
+            this.ui.recordingStatus.textContent = 'Playing';
+            this.ui.recordingStatus.classList.add('status-ready');
+            this.ui.recordingHelper.textContent = 'Hum or sing to hear your voice transformed!';
 
-            console.log('Recording started');
+            console.log('✓ Kazoo Proto is running!');
 
         } catch (error) {
             console.error('Failed to start:', error);
-            alert('Failed to start: ' + error.message);
+            alert('Failed to start: ' + error.message + '\n\nPlease check:\n- Microphone permission\n- HTTPS connection\n- Browser compatibility');
         }
     }
 
     /**
-     * 停止录音
+     * 停止播放
      */
     stop() {
         this.isRunning = false;
@@ -317,14 +172,16 @@ Next steps:
         this.ui.stopBtn.classList.add('hidden');
         this.ui.systemStatus.textContent = 'Stopped';
         this.ui.systemStatus.classList.remove('active');
+        this.ui.recordingStatus.textContent = 'Ready';
+        this.ui.recordingHelper.textContent = 'No setup required • Works in your browser';
 
-        console.log('Recording stopped');
+        console.log('Kazoo Proto stopped');
     }
 
     /**
-     * 播放模式音频处理 - 关键修复：输出音频
+     * 音频处理 - 直接处理，无校准
      */
-    onPlaybackAudioProcess(audioBuffer) {
+    onAudioProcess(audioBuffer) {
         const volume = audioInputManager.getVolume(audioBuffer);
         const pitchInfo = pitchDetector.detect(audioBuffer, volume);
 
@@ -334,11 +191,17 @@ Next steps:
             this.ui.currentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
             this.ui.confidence.textContent = `${Math.round(pitchInfo.confidence * 100)}%`;
 
-            // 驱动合成器发声 - 这是关键！
+            // 驱动合成器发声
             synthesizerEngine.processPitch(pitchInfo);
 
             // 可视化
             this.updateVisualizer(pitchInfo);
+
+            // 更新性能监控
+            const latency = performanceMonitor.recordFrame();
+            if (latency !== null) {
+                this.ui.latency.textContent = `${latency.toFixed(1)}ms`;
+            }
         } else {
             // 没有音高，停止发声
             synthesizerEngine.stopNote();

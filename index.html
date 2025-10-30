@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,10 +23,10 @@
             <div class="hero-icon">🎵</div>
             <h1 class="hero-title">Transform Your Voice</h1>
             <p class="hero-subtitle">Sing or hum, and hear yourself as any instrument in real-time</p>
-            <div class="hero-badge">Ultra-low latency • Professional quality</div>
+            <div class="hero-badge">Ultra-low latency • Zero setup</div>
         </section>
 
-        <!-- 使用步骤 - 更现代化的进度指示器 -->
+        <!-- 简化的2步流程 -->
         <div class="steps-timeline">
             <div class="timeline-line"></div>
             <div class="step-card" data-step="1">
@@ -34,8 +34,8 @@
                     <div class="step-number">1</div>
                 </div>
                 <div class="step-content">
-                    <h3 class="step-title">Calibrate Your Voice</h3>
-                    <p class="step-description">Takes 10 seconds. Sing your lowest note, then your highest. We'll map your unique vocal range.</p>
+                    <h3 class="step-title">Pick Your Sound</h3>
+                    <p class="step-description">Choose from 6 realistic instruments: Saxophone, Violin, Piano, Flute, Guitar, or Synth.</p>
                 </div>
             </div>
             <div class="step-card" data-step="2">
@@ -43,46 +43,21 @@
                     <div class="step-number">2</div>
                 </div>
                 <div class="step-content">
-                    <h3 class="step-title">Pick Your Sound</h3>
-                    <p class="step-description">Choose from 6 realistic instruments: Saxophone, Violin, Piano, Flute, Guitar, or Synth.</p>
-                </div>
-            </div>
-            <div class="step-card" data-step="3">
-                <div class="step-icon">
-                    <div class="step-number">3</div>
-                </div>
-                <div class="step-content">
-                    <h3 class="step-title">Make Music</h3>
-                    <p class="step-description">Start humming! Watch real-time pitch visualization and hear your voice transformed instantly.</p>
+                    <h3 class="step-title">Start Playing</h3>
+                    <p class="step-description">Click start, allow microphone access, and begin humming. Hear yourself instantly!</p>
                 </div>
             </div>
         </div>
 
-        <!-- 控制区 -->
+        <!-- 控制区 - 简化为2个卡片 -->
         <section class="control-section">
-            <div class="control-card">
-                <div class="control-header">
-                    <h2 class="section-title">Step 1: Voice Calibration</h2>
-                    <div class="status-badge" id="calibrationStatus">Not calibrated</div>
-                </div>
-                <p class="section-subtitle">Help us understand your unique vocal range. This ensures accurate pitch detection.</p>
-
-                <div class="text-center mb-8">
-                    <button class="btn btn-primary btn-large pulse" id="calibrateBtn">
-                        <span class="btn-icon">🎤</span>
-                        <span>Start Calibration</span>
-                    </button>
-                    <p class="helper-text">Click to begin • Allow microphone access when prompted</p>
-                </div>
-            </div>
-
             <!-- 乐器选择 -->
             <div class="control-card" id="instrumentSection">
                 <div class="control-header">
-                    <h2 class="section-title">Step 2: Choose Your Instrument</h2>
+                    <h2 class="section-title">Choose Your Instrument</h2>
                     <div class="status-badge" id="instrumentStatus">Saxophone</div>
                 </div>
-                <p class="section-subtitle">Each instrument has unique tonal characteristics. Experiment to find your favorite!</p>
+                <p class="section-subtitle">Each instrument has unique tonal characteristics. You can change it anytime!</p>
 
                 <div class="instrument-grid">
                     <button class="instrument-btn active" data-instrument="saxophone">
@@ -121,21 +96,21 @@
             <!-- 主控制按钮 -->
             <div class="control-card" id="recordingSection">
                 <div class="control-header">
-                    <h2 class="section-title">Step 3: Start Playing</h2>
+                    <h2 class="section-title">Ready to Play?</h2>
                     <div class="status-badge status-ready" id="recordingStatus">Ready</div>
                 </div>
-                <p class="section-subtitle">Hit the button and start humming. Your voice will be transformed in real-time!</p>
+                <p class="section-subtitle">Click the button below and start singing or humming. Your voice will be transformed in real-time!</p>
 
                 <div class="text-center">
-                    <button class="btn btn-primary btn-large hidden" id="startBtn">
+                    <button class="btn btn-primary btn-large pulse" id="startBtn">
                         <span class="btn-icon">▶️</span>
-                        <span>Start Recording</span>
+                        <span>Start Playing</span>
                     </button>
                     <button class="btn btn-danger btn-large hidden" id="stopBtn">
                         <span class="btn-icon">⏹️</span>
                         <span>Stop</span>
                     </button>
-                    <p class="helper-text" id="recordingHelper">Complete calibration first</p>
+                    <p class="helper-text" id="recordingHelper">No setup required • Works in your browser</p>
                 </div>
             </div>
         </section>
@@ -176,54 +151,20 @@
                     <li>HTTPS or localhost connection</li>
                 </ul>
 
+                <h4 style="margin-bottom: 12px;">Tips for Best Results</h4>
+                <ul style="margin-left: 20px; margin-bottom: 16px;">
+                    <li>Use headphones to prevent feedback</li>
+                    <li>Keep microphone 10-20cm from your mouth</li>
+                    <li>Sing steady notes rather than sliding</li>
+                    <li>Use in a quiet environment</li>
+                </ul>
+
                 <div class="warning-box hidden" id="warningBox">
                     <strong>Issues Detected:</strong>
                     <div id="warningText"></div>
                 </div>
             </div>
         </section>
-    </div>
-
-    <!-- 校准模态弹窗 -->
-    <div class="modal-overlay" id="calibrationModal">
-        <div class="modal">
-            <div class="modal-icon" id="modalStepIcon">🎤</div>
-            <h2 class="modal-title" id="modalTitle">Voice Calibration</h2>
-            <div class="modal-step-indicator">
-                <span class="step-dot active" id="stepDot1"></span>
-                <span class="step-dot" id="stepDot2"></span>
-            </div>
-            <p class="modal-description" id="modalDescription">
-                Sing your lowest comfortable note and hold for 5 seconds.
-            </p>
-            <div class="modal-tip" id="modalTip">
-                💡 Tip: Use a steady, comfortable volume. Don't strain!
-            </div>
-
-            <div class="progress-container">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <p class="progress-text" id="progressText">0.0 / 5.0 seconds</p>
-            </div>
-
-            <div class="pitch-display-modal">
-                <div class="pitch-info">
-                    <div class="pitch-label">Current Note</div>
-                    <div class="current-note-large" id="modalCurrentNote">--</div>
-                </div>
-                <div class="pitch-info">
-                    <div class="pitch-label">Frequency</div>
-                    <div class="current-freq-large" id="modalCurrentFreq">-- Hz</div>
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="cancelCalibrationBtn">
-                    <span>Cancel</span>
-                </button>
-            </div>
-        </div>
     </div>
 
     <!-- 库文件 -->
@@ -234,8 +175,8 @@
     <script src="js/audio-input.js"></script>
     <script src="js/pitch-detector.js"></script>
     <script src="js/synthesizer.js"></script>
-    <script src="js/calibration.js"></script>
     <script src="js/performance.js"></script>
     <script src="js/main.js"></script>
+    <!-- 注意：不再加载 calibration.js -->
 </body>
 </html>

@@ -128,8 +128,8 @@ class SynthesizerEngine {
                     }
                 });
                 this.currentSynth.portamento = 0.05;
-                this.vibrato.frequency.value = 6;
-                this.vibrato.depth.value = 0.3;
+                // this.vibrato.frequency.value = 6;  // 暂时禁用
+                // this.vibrato.depth.value = 0.3;
                 break;
 
             case 'piano':

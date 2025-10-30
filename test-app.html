@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal App Test</title>
+</head>
+<body>
+    <h1>最小化应用测试</h1>
+    <button id="testBtn">开始测试</button>
+    <div id="log" style="margin-top: 20px; font-family: monospace;"></div>
+
+    <script src="js/lib/tone.js"></script>
+    <script src="js/lib/pitchfinder-browser.js"></script>
+
+    <script>
+        const log = document.getElementById('log');
+        const btn = document.getElementById('testBtn');
+
+        function addLog(msg) {
+            log.innerHTML += `<div>${msg}</div>`;
+            console.log(msg);
+        }
+
+        btn.addEventListener('click', async () => {
+            addLog('=== 开始测试 ===');
+
+            try {
+                // 1. 启动 Tone.js
+                await Tone.start();
+                addLog('✓ Tone.js started');
+
+                // 2. 创建萨克斯合成器（就像主应用一样）
+                const synth = new Tone.FMSynth({
+                    harmonicity: 3,
+                    modulationIndex: 12,
+                    oscillator: { type: 'sine' },
+                    envelope: {
+                        attack: 0.05,
+                        decay: 0.1,
+                        sustain: 0.95,
+                        release: 0.4
+                    },
+                    modulation: { type: 'square' },
+                    modulationEnvelope: {
+                        attack: 0.3,
+                        decay: 0.1,
+                        sustain: 1,
+                        release: 0.3
+                    }
+                }).toDestination();
+
+                synth.portamento = 0.05;
+                addLog('✓ FMSynth (saxophone) created');
+
+                // 3. 播放音符（就像主应用一样）
+                const now = Tone.now();
+                synth.triggerAttack('C4', now, 0.8);
+                addLog('✓ triggerAttack called on C4');
+
+                addLog('<strong style="color: green;">应该听到萨克斯声音！</strong>');
+
+                // 4. 2秒后停止
+                setTimeout(() => {
+                    synth.triggerRelease(Tone.now());
+                    addLog('✓ triggerRelease called');
+                }, 2000);
+
+            } catch (error) {
+                addLog(`<span style="color: red;">❌ Error: ${error.message}</span>`);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

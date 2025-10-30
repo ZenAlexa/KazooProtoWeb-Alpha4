@@ -68,7 +68,10 @@
                     <div class="progress-bar">
                         <div id="calibrationProgress" class="progress-fill"></div>
                     </div>
-                    <span id="calibrationStep">0/2</span>
+                    <div class="progress-info">
+                        <span id="calibrationStep">0/2</span>
+                        <span id="calibrationTimer" class="timer hidden">0.0s / 2.0s</span>
+                    </div>
                 </div>
                 <button id="calibrateBtn" class="btn btn-primary">开始校准</button>
                 <div id="calibrationResult" class="calibration-result hidden">
@@ -182,7 +185,39 @@
 
     <!-- 加载外部库 -->
     <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pitchfinder@2.3.0/dist/pitchfinder.min.js"></script>
+    <script src="https://unpkg.com/pitchfinder@2.3.0/dist/pitchfinder.umd.js"></script>
+
+    <!-- 库加载检测 -->
+    <script>
+        // 检测库是否加载成功
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const issues = [];
+                if (typeof Tone === 'undefined') {
+                    issues.push('Tone.js 库加载失败');
+                }
+                if (typeof Pitchfinder === 'undefined') {
+                    issues.push('Pitchfinder 库加载失败');
+                }
+
+                if (issues.length > 0) {
+                    const warningDiv = document.getElementById('browserWarning');
+                    const issuesP = document.getElementById('browserIssues');
+                    if (warningDiv && issuesP) {
+                        issuesP.innerHTML = '<strong>外部库加载失败:</strong><br>' +
+                                           issues.map(issue => `• ${issue}`).join('<br>') +
+                                           '<br><br><strong>可能的原因:</strong><br>' +
+                                           '• 网络连接问题<br>' +
+                                           '• CDN被墙（在中国大陆）<br>' +
+                                           '• 浏览器扩展阻止了脚本加载<br><br>' +
+                                           '<strong>解决方法:</strong> 请刷新页面重试，或检查网络连接。';
+                        warningDiv.classList.remove('hidden');
+                    }
+                    console.error('Library loading failed:', issues);
+                }
+            }, 1000);
+        });
+    </script>
 
     <!-- 加载应用模块 -->
     <script src="js/audio-input.js"></script>

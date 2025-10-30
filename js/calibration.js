@@ -23,6 +23,9 @@ class CalibrationSystem {
         this.sampleDuration = 2000; // 每步采样2秒
         this.sampleStartTime = 0;
 
+        // 计时器
+        this.timerInterval = null;
+
         // 回调函数
         this.onCalibrationUpdate = null;
         this.onCalibrationComplete = null;
@@ -39,12 +42,52 @@ class CalibrationSystem {
 
         console.log('Calibration started: Step 1 - Detecting lowest pitch');
 
+        // 启动计时器
+        this.startTimer();
+
         if (this.onCalibrationUpdate) {
             this.onCalibrationUpdate({
                 step: 1,
                 instruction: '请唱出你能唱的最低音，并保持2秒...',
-                progress: 0
+                progress: 0,
+                elapsed: 0
             });
+        }
+    }
+
+    /**
+     * 启动计时器
+     */
+    startTimer() {
+        this.stopTimer(); // 先停止之前的计时器
+
+        this.timerInterval = setInterval(() => {
+            if (!this.isCalibrating) {
+                this.stopTimer();
+                return;
+            }
+
+            const elapsed = Date.now() - this.sampleStartTime;
+            const progress = Math.min((elapsed / this.sampleDuration) * 100, 100);
+
+            if (this.onCalibrationUpdate) {
+                this.onCalibrationUpdate({
+                    step: this.calibrationStep,
+                    progress: progress,
+                    elapsed: elapsed,
+                    remaining: Math.max(0, this.sampleDuration - elapsed)
+                });
+            }
+        }, 50); // 每50ms更新一次
+    }
+
+    /**
+     * 停止计时器
+     */
+    stopTimer() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
         }
     }
 
@@ -115,11 +158,15 @@ class CalibrationSystem {
             this.samples = [];
             this.sampleStartTime = Date.now();
 
+            // 重启计时器
+            this.startTimer();
+
             if (this.onCalibrationUpdate) {
                 this.onCalibrationUpdate({
                     step: 2,
                     instruction: '很好！现在请唱出你能唱的最高音，并保持2秒...',
-                    progress: 0
+                    progress: 0,
+                    elapsed: 0
                 });
             }
 
@@ -159,6 +206,9 @@ class CalibrationSystem {
 
         this.isCalibrating = false;
         this.calibrationStep = 3;
+
+        // 停止计时器
+        this.stopTimer();
 
         console.log('Calibration completed:', this.calibrationData);
 

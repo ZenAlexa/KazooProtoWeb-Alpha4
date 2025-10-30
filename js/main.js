@@ -25,6 +25,7 @@ class KazooProtoApp {
             calibrationInstruction: document.getElementById('calibrationInstruction'),
             calibrationProgress: document.getElementById('calibrationProgress'),
             calibrationStep: document.getElementById('calibrationStep'),
+            calibrationTimer: document.getElementById('calibrationTimer'),
             calibrationResult: document.getElementById('calibrationResult'),
             rangeDisplay: document.getElementById('rangeDisplay'),
 
@@ -435,12 +436,26 @@ class KazooProtoApp {
      * 校准更新回调
      */
     onCalibrationUpdate(data) {
-        const { step, instruction, progress, currentNote } = data;
+        const { step, instruction, progress, currentNote, elapsed } = data;
 
-        this.ui.calibrationInstruction.textContent = instruction;
+        // 更新指令
+        if (instruction) {
+            this.ui.calibrationInstruction.textContent = instruction;
+        }
+
+        // 更新进度条
         this.ui.calibrationProgress.style.width = progress + '%';
         this.ui.calibrationStep.textContent = `${step}/2`;
 
+        // 更新计时器
+        if (elapsed !== undefined) {
+            const elapsedSec = (elapsed / 1000).toFixed(1);
+            const totalSec = 2.0;
+            this.ui.calibrationTimer.textContent = `${elapsedSec}s / ${totalSec}s`;
+            this.ui.calibrationTimer.classList.remove('hidden');
+        }
+
+        // 更新当前音符显示
         if (currentNote) {
             this.ui.currentNote.textContent = currentNote;
         }
@@ -451,6 +466,9 @@ class KazooProtoApp {
      */
     onCalibrationComplete(calibrationData) {
         const { lowestNote, highestNote, range } = calibrationData;
+
+        // 隐藏计时器
+        this.ui.calibrationTimer.classList.add('hidden');
 
         this.ui.calibrationResult.classList.remove('hidden');
         this.ui.rangeDisplay.textContent =

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kazoo Proto - 实时人声乐器转换</title>
+    <meta name="description" content="将你的哼唱实时转换为多种乐器音色">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header>
+            <h1>🎵 Kazoo Proto</h1>
+            <p class="subtitle">实时人声到乐器转换 · Web音频黑科技</p>
+        </header>
+
+        <!-- 主控制区 -->
+        <main>
+            <!-- 状态指示器 -->
+            <div class="status-panel">
+                <div class="status-item">
+                    <span class="label">状态:</span>
+                    <span id="systemStatus" class="value status-idle">未启动</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">延迟:</span>
+                    <span id="latency" class="value">-- ms</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">检测置信度:</span>
+                    <span id="confidence" class="value">--%</span>
+                </div>
+            </div>
+
+            <!-- 音高可视化 -->
+            <div class="visualizer-container">
+                <h3>实时音高检测</h3>
+                <canvas id="pitchCanvas" width="800" height="200"></canvas>
+                <div class="pitch-info">
+                    <div class="pitch-display">
+                        <span class="label">当前音高:</span>
+                        <span id="currentNote" class="note-value">--</span>
+                        <span id="currentFreq" class="freq-value">(-- Hz)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 校准面板 -->
+            <div class="calibration-panel" id="calibrationPanel">
+                <h3>🎯 校准系统</h3>
+                <p class="instruction" id="calibrationInstruction">
+                    点击开始校准，我们将测试你的音域范围
+                </p>
+                <div class="calibration-progress">
+                    <div class="progress-bar">
+                        <div id="calibrationProgress" class="progress-fill"></div>
+                    </div>
+                    <span id="calibrationStep">0/2</span>
+                </div>
+                <button id="calibrateBtn" class="btn btn-primary">开始校准</button>
+                <div id="calibrationResult" class="calibration-result hidden">
+                    <p>✓ 校准完成！</p>
+                    <p>音域: <span id="rangeDisplay">--</span></p>
+                </div>
+            </div>
+
+            <!-- 乐器选择 -->
+            <div class="instrument-panel">
+                <h3>🎸 选择乐器音色</h3>
+                <div class="instrument-grid">
+                    <button class="instrument-btn active" data-instrument="saxophone">
+                        <span class="icon">🎷</span>
+                        <span class="name">萨克斯风</span>
+                    </button>
+                    <button class="instrument-btn" data-instrument="violin">
+                        <span class="icon">🎻</span>
+                        <span class="name">小提琴</span>
+                    </button>
+                    <button class="instrument-btn" data-instrument="piano">
+                        <span class="icon">🎹</span>
+                        <span class="name">钢琴</span>
+                    </button>
+                    <button class="instrument-btn" data-instrument="flute">
+                        <span class="icon">🎺</span>
+                        <span class="name">长笛</span>
+                    </button>
+                    <button class="instrument-btn" data-instrument="guitar">
+                        <span class="icon">🎸</span>
+                        <span class="name">吉他</span>
+                    </button>
+                    <button class="instrument-btn" data-instrument="synth">
+                        <span class="icon">⚡</span>
+                        <span class="name">合成器</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 控制按钮 -->
+            <div class="control-panel">
+                <button id="startBtn" class="btn btn-large btn-success">
+                    <span class="btn-icon">🎤</span>
+                    <span class="btn-text">开始录音</span>
+                </button>
+                <button id="stopBtn" class="btn btn-large btn-danger hidden">
+                    <span class="btn-icon">⏹</span>
+                    <span class="btn-text">停止</span>
+                </button>
+            </div>
+
+            <!-- 高级设置 -->
+            <div class="settings-panel">
+                <details>
+                    <summary>⚙️ 高级设置</summary>
+                    <div class="settings-content">
+                        <div class="setting-item">
+                            <label for="sensitivity">灵敏度</label>
+                            <input type="range" id="sensitivity" min="0" max="100" value="50">
+                            <span id="sensitivityValue">50%</span>
+                        </div>
+                        <div class="setting-item">
+                            <label for="smoothing">音高平滑</label>
+                            <input type="range" id="smoothing" min="0" max="100" value="30">
+                            <span id="smoothingValue">30%</span>
+                        </div>
+                        <div class="setting-item">
+                            <label for="mixLevel">混音比例 (原声/合成)</label>
+                            <input type="range" id="mixLevel" min="0" max="100" value="100">
+                            <span id="mixValue">100% 合成</span>
+                        </div>
+                        <div class="setting-item">
+                            <label for="minConfidence">最小置信度阈值</label>
+                            <input type="range" id="minConfidence" min="0" max="100" value="60">
+                            <span id="minConfidenceValue">60%</span>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- 性能监控 -->
+            <div class="performance-panel">
+                <h4>📊 性能监控</h4>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <span class="metric-label">音频缓冲:</span>
+                        <span id="bufferSize">256 samples</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">采样率:</span>
+                        <span id="sampleRate">44100 Hz</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">总延迟:</span>
+                        <span id="totalLatency">-- ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">检测帧率:</span>
+                        <span id="detectionFPS">-- FPS</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>基于 Web Audio API + Tone.js + YIN算法 构建</p>
+            <p>实时低延迟音频处理技术演示</p>
+        </footer>
+    </div>
+
+    <!-- 加载外部库 -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pitchfinder@2.3.0/dist/pitchfinder.min.js"></script>
+
+    <!-- 加载应用模块 -->
+    <script src="js/audio-input.js"></script>
+    <script src="js/pitch-detector.js"></script>
+    <script src="js/synthesizer.js"></script>
+    <script src="js/calibration.js"></script>
+    <script src="js/performance.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

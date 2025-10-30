@@ -1,0 +1,35 @@
+{
+  "name": "kazoo-proto-web",
+  "version": "1.0.0",
+  "description": "实时人声到乐器音色转换Web应用",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "start": "npx serve . -p 3000",
+    "build": "echo 'No build required for static site'",
+    "deploy": "vercel --prod"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zimingwang/KazooProtoWeb-Alpha4.git"
+  },
+  "keywords": [
+    "audio",
+    "pitch-detection",
+    "web-audio",
+    "tone.js",
+    "yin-algorithm",
+    "real-time",
+    "music",
+    "synthesizer"
+  ],
+  "author": "Ziming Wang",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

@@ -1,6 +1,11 @@
 /**
  * 性能监控模块
  * 监控延迟、帧率和系统性能
+ *
+ * Phase 1 增强:
+ * - 支持 AudioWorklet 模式指标
+ * - 记录处理器类型 (worklet/script-processor)
+ * - Worklet 性能统计集成
  */
 
 class PerformanceMonitor {
@@ -16,7 +21,10 @@ class PerformanceMonitor {
             frameCount: 0,
             lastFrameTime: 0,
             bufferSize: 0,
-            sampleRate: 0
+            sampleRate: 0,
+            // Phase 1: AudioWorklet 指标
+            mode: 'unknown',    // 'worklet' | 'script-processor'
+            workletStats: null  // Worklet 性能统计
         };
 
         // FPS计算
@@ -34,19 +42,32 @@ class PerformanceMonitor {
 
     /**
      * 初始化性能监控
+     * @param {AudioContext} audioContext - 音频上下文
+     * @param {number} bufferSize - 缓冲大小
+     * @param {string} mode - 处理器模式 ('worklet' | 'script-processor')
      */
-    initialize(audioContext, bufferSize) {
+    initialize(audioContext, bufferSize, mode = 'script-processor') {
         this.metrics.bufferSize = bufferSize;
         this.metrics.sampleRate = audioContext.sampleRate;
+        this.metrics.mode = mode;
 
         // 计算音频缓冲延迟
         this.metrics.latency.audio = this.calculateAudioLatency(audioContext, bufferSize);
 
         console.log('Performance monitor initialized:', {
+            mode: mode,
             bufferSize: bufferSize,
             sampleRate: this.metrics.sampleRate,
             audioLatency: this.metrics.latency.audio.toFixed(2) + 'ms'
         });
+    }
+
+    /**
+     * 更新 Worklet 统计信息 (Phase 1)
+     * @param {Object} workletStats - Worklet 性能统计
+     */
+    updateWorkletStats(workletStats) {
+        this.metrics.workletStats = workletStats;
     }
 
     /**
@@ -150,7 +171,10 @@ class PerformanceMonitor {
             processingLatency: this.metrics.latency.processing.toFixed(2),
             fps: this.metrics.fps,
             bufferSize: this.metrics.bufferSize,
-            sampleRate: this.metrics.sampleRate
+            sampleRate: this.metrics.sampleRate,
+            // Phase 1: 新增字段
+            mode: this.metrics.mode,
+            workletStats: this.metrics.workletStats
         };
     }
 

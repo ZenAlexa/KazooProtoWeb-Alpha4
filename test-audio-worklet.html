@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AudioWorklet 测试 - Phase 1.6</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            background: #f0f4f8;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .status-item:last-child { border-bottom: none; }
+        .label { font-weight: 600; color: #334155; }
+        .value { color: #64748b; font-family: 'Courier New', monospace; }
+        .value.success { color: #10b981; }
+        .value.error { color: #ef4444; }
+        .value.warning { color: #f59e0b; }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover { background: #dc2626; }
+
+        #console {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-entry {
+            margin: 4px 0;
+            padding: 4px 0;
+        }
+        .log-info { color: #60a5fa; }
+        .log-success { color: #34d399; }
+        .log-warning { color: #fbbf24; }
+        .log-error { color: #f87171; }
+        .log-time { color: #64748b; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 AudioWorklet 测试页面</h1>
+        <p class="subtitle">Phase 1.6: 验证 AudioWorklet 加载与通信</p>
+
+        <div class="status">
+            <div class="status-item">
+                <span class="label">浏览器支持</span>
+                <span class="value" id="browserSupport">检测中...</span>
+            </div>
+            <div class="status-item">
+                <span class="label">AudioWorklet 支持</span>
+                <span class="value" id="workletSupport">检测中...</span>
+            </div>
+            <div class="status-item">
+                <span class="label">当前模式</span>
+                <span class="value" id="currentMode">-</span>
+            </div>
+            <div class="status-item">
+                <span class="label">延迟 (理论)</span>
+                <span class="value" id="latency">-</span>
+            </div>
+            <div class="status-item">
+                <span class="label">已处理帧数</span>
+                <span class="value" id="framesProcessed">0</span>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="btn-primary" id="testWorklet">测试 AudioWorklet</button>
+            <button class="btn-secondary" id="testScriptProcessor">测试 ScriptProcessor</button>
+            <button class="btn-danger" id="stopBtn" disabled>停止</button>
+        </div>
+
+        <div id="console"></div>
+    </div>
+
+    <script src="js/audio-io.js"></script>
+    <script>
+        // 控制台日志
+        const consoleEl = document.getElementById('console');
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span>${message}`;
+            consoleEl.appendChild(entry);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // 劫持 console.log
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+            log(message, 'info');
+        };
+
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+            log(message, 'error');
+        };
+
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+            log(message, 'warning');
+        };
+
+        // 检测浏览器支持
+        const ua = navigator.userAgent;
+        let browserName = 'Unknown';
+        if (ua.indexOf('Chrome') > -1) browserName = 'Chrome';
+        else if (ua.indexOf('Firefox') > -1) browserName = 'Firefox';
+        else if (ua.indexOf('Safari') > -1) browserName = 'Safari';
+        else if (ua.indexOf('Edge') > -1) browserName = 'Edge';
+
+        document.getElementById('browserSupport').textContent = browserName;
+        document.getElementById('browserSupport').className = 'value success';
+
+        // 检测 AudioWorklet 支持
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            const tempCtx = new AudioContextClass();
+            const hasWorklet = 'audioWorklet' in tempCtx;
+            document.getElementById('workletSupport').textContent = hasWorklet ? '✓ 支持' : '✗ 不支持';
+            document.getElementById('workletSupport').className = hasWorklet ? 'value success' : 'value error';
+            tempCtx.close();
+        }
+
+        // 创建 AudioIO 实例
+        const audioIO = new AudioIO();
+
+        // 测试 AudioWorklet
+        document.getElementById('testWorklet').addEventListener('click', async () => {
+            try {
+                log('===== 开始测试 AudioWorklet =====', 'success');
+
+                audioIO.configure({
+                    useWorklet: true,
+                    workletBufferSize: 128,
+                    workletFallback: true,
+                    debug: true
+                });
+
+                const result = await audioIO.start();
+
+                document.getElementById('currentMode').textContent = result.mode;
+                document.getElementById('currentMode').className = result.mode === 'worklet' ? 'value success' : 'value warning';
+                document.getElementById('latency').textContent = result.totalLatency + ' ms';
+                document.getElementById('stopBtn').disabled = false;
+
+                log(`✅ 启动成功！模式: ${result.mode}, 延迟: ${result.totalLatency}ms`, 'success');
+
+            } catch (error) {
+                log(`❌ 启动失败: ${error.message}`, 'error');
+            }
+        });
+
+        // 测试 ScriptProcessor
+        document.getElementById('testScriptProcessor').addEventListener('click', async () => {
+            try {
+                log('===== 开始测试 ScriptProcessor =====', 'success');
+
+                audioIO.configure({
+                    useWorklet: false,
+                    bufferSize: 2048
+                });
+
+                const result = await audioIO.start();
+
+                document.getElementById('currentMode').textContent = result.mode;
+                document.getElementById('currentMode').className = 'value warning';
+                document.getElementById('latency').textContent = result.totalLatency + ' ms';
+                document.getElementById('stopBtn').disabled = false;
+
+                log(`✅ 启动成功！模式: ${result.mode}, 延迟: ${result.totalLatency}ms`, 'success');
+
+            } catch (error) {
+                log(`❌ 启动失败: ${error.message}`, 'error');
+            }
+        });
+
+        // 停止
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            audioIO.stop();
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('currentMode').textContent = '-';
+            document.getElementById('latency').textContent = '-';
+            log('⏹️ 已停止', 'info');
+        });
+
+        // 监听状态变化
+        audioIO.onStateChange((state, info) => {
+            log(`状态变化: ${state}`, 'success');
+        });
+
+        // 监听错误
+        audioIO.onError((type, error) => {
+            log(`错误 [${type}]: ${error.message}`, 'error');
+        });
+
+        // 定期更新统计
+        setInterval(() => {
+            if (audioIO.isRunning) {
+                const stats = audioIO.getStats();
+                document.getElementById('framesProcessed').textContent = stats.framesProcessed;
+            }
+        }, 1000);
+
+        log('👋 测试页面已加载，选择一个模式开始测试', 'info');
+    </script>
+</body>
+</html>

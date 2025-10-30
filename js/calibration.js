@@ -20,11 +20,14 @@ class CalibrationSystem {
 
         // 采样数据
         this.samples = [];
-        this.sampleDuration = 2000; // 每步采样2秒
+        this.sampleDuration = 5000; // 每步采样5秒
         this.sampleStartTime = 0;
 
         // 计时器
         this.timerInterval = null;
+
+        // 是否被取消
+        this.cancelled = false;
 
         // 回调函数
         this.onCalibrationUpdate = null;
@@ -38,6 +41,7 @@ class CalibrationSystem {
         this.isCalibrating = true;
         this.calibrationStep = 1;
         this.samples = [];
+        this.cancelled = false;
         this.sampleStartTime = Date.now();
 
         console.log('Calibration started: Step 1 - Detecting lowest pitch');
@@ -48,11 +52,22 @@ class CalibrationSystem {
         if (this.onCalibrationUpdate) {
             this.onCalibrationUpdate({
                 step: 1,
-                instruction: '请唱出你能唱的最低音，并保持2秒...',
+                instruction: 'Sing your lowest comfortable note and hold for 5 seconds.',
                 progress: 0,
                 elapsed: 0
             });
         }
+    }
+
+    /**
+     * 取消校准
+     */
+    cancel() {
+        this.cancelled = true;
+        this.isCalibrating = false;
+        this.stopTimer();
+        this.reset();
+        console.log('Calibration cancelled');
     }
 
     /**
@@ -164,7 +179,7 @@ class CalibrationSystem {
             if (this.onCalibrationUpdate) {
                 this.onCalibrationUpdate({
                     step: 2,
-                    instruction: '很好！现在请唱出你能唱的最高音，并保持2秒...',
+                    instruction: 'Great! Now sing your highest comfortable note and hold for 5 seconds.',
                     progress: 0,
                     elapsed: 0
                 });

@@ -43,6 +43,12 @@ else
     echo "  ✓ 无builds配置（正确）"
 fi
 
+if grep -q "\"outputDirectory\"" vercel.json; then
+    echo "  ✓ outputDirectory已配置"
+else
+    echo "  ✗ 缺少outputDirectory配置"
+fi
+
 if grep -q "Cross-Origin-Embedder-Policy" vercel.json; then
     echo "  ✓ COOP/COEP headers已配置"
 else
@@ -94,15 +100,31 @@ fi
 
 echo ""
 
+# 检查package.json
+echo "📋 检查package.json..."
+if grep -q "\"build\":" package.json; then
+    echo "  ⚠️  发现build脚本 - 纯静态网站应移除"
+else
+    echo "  ✓ 无build脚本（正确 - 纯静态网站）"
+fi
+
+echo ""
+
 # 总结
 echo "===================="
 if [ $missing_files -eq 0 ]; then
     echo "✅ 所有检查通过！可以部署到Vercel"
     echo ""
+    echo "配置摘要："
+    echo "  - 输出目录: . (根目录)"
+    echo "  - 网站类型: 静态网站"
+    echo "  - COOP/COEP: 已配置"
+    echo ""
     echo "下一步："
     echo "1. git push origin main (如果有未推送的提交)"
     echo "2. 访问 Vercel Dashboard 查看部署状态"
-    echo "3. 或运行: vercel --prod"
+    echo "3. 等待部署完成（约1-2分钟）"
+    echo "4. 获取Production URL并测试"
 else
     echo "❌ 发现 $missing_files 个问题，请修复后再部署"
 fi

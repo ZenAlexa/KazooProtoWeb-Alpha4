@@ -187,13 +187,13 @@ class KazooApp {
 
             // 配置 AudioIO
             this.audioIO.configure({
-                useWorklet: false,          // Phase 1 默认 false (安全)
-                workletBufferSize: 128,     // 低延迟目标
+                useWorklet: true,           // Phase 1 完成: 启用 AudioWorklet!
+                workletBufferSize: 128,     // 低延迟目标 (2.9ms @ 44.1kHz)
                 bufferSize: 2048,           // ScriptProcessor 回退
-                workletFallback: true,      // 自动回退
+                workletFallback: true,      // 自动回退到 ScriptProcessor
                 sampleRate: 44100,
                 latencyHint: 'interactive',
-                debug: false
+                debug: true                 // 启用调试日志
             });
 
             // 注册音高检测回调 (Worklet 模式)

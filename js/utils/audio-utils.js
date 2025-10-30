@@ -104,7 +104,8 @@ export function frequencyToNote(frequency) {
   // 计算相对于 C0 的半音数
   const halfSteps = Math.round(12 * Math.log2(frequency / C0));
   const octave = Math.floor(halfSteps / 12);
-  const noteIndex = halfSteps % 12;
+  // 处理负数半音：确保 noteIndex 始终在 0-11 范围内
+  const noteIndex = ((halfSteps % 12) + 12) % 12;
 
   const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const note = noteNames[noteIndex];
@@ -130,6 +131,7 @@ export function frequencyToNote(frequency) {
  * @param {Float32Array} buffer - 时域信号
  * @param {number} fftSize - FFT 大小 (必须是 2 的幂次)
  * @returns {Float32Array} 频谱幅度数组 (长度为 fftSize/2)
+ *                         返回原始幅度（未除以 N），需要在 SpectralFeatures 中归一化
  * @throws {TypeError} 如果 fftSize 不是 2 的幂次
  */
 export function performSimpleFFT(buffer, fftSize) {
@@ -192,8 +194,12 @@ function _fftRadix2(x) {
     for (let i = 0; i < N; i += size) {
       for (let j = i, k = 0; j < i + halfSize; j++, k += step) {
         const angle = -2 * Math.PI * k / N;
-        const tpre = Math.cos(angle) * complex[(j + halfSize) * 2] - Math.sin(angle) * complex[(j + halfSize) * 2 + 1];
-        const tpim = Math.sin(angle) * complex[(j + halfSize) * 2] + Math.cos(angle) * complex[(j + halfSize) * 2 + 1];
+        // 预计算 twiddle factor 的三角函数值
+        const cosAngle = Math.cos(angle);
+        const sinAngle = Math.sin(angle);
+
+        const tpre = cosAngle * complex[(j + halfSize) * 2] - sinAngle * complex[(j + halfSize) * 2 + 1];
+        const tpim = sinAngle * complex[(j + halfSize) * 2] + cosAngle * complex[(j + halfSize) * 2 + 1];
 
         complex[(j + halfSize) * 2] = complex[j * 2] - tpre;
         complex[(j + halfSize) * 2 + 1] = complex[j * 2 + 1] - tpim;
@@ -225,7 +231,14 @@ function _reverseBits(x, n) {
  * @returns {Float32Array} 归一化后的频谱
  */
 export function normalizeSpectrum(spectrum) {
-  const max = Math.max(...spectrum);
+  // 使用循环查找最大值，避免大数组 spread 导致 call stack 问题
+  let max = 0;
+  for (let i = 0; i < spectrum.length; i++) {
+    if (spectrum[i] > max) {
+      max = spectrum[i];
+    }
+  }
+
   if (max === 0) {
     return new Float32Array(spectrum.length);
   }

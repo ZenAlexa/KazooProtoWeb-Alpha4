@@ -1,6 +1,7 @@
 {
   "name": "kazoo-proto-web",
   "version": "1.0.0",
+  "type": "module",
   "description": "实时人声到乐器音色转换Web应用",
   "main": "index.html",
   "scripts": {

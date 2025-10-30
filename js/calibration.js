@@ -138,24 +138,36 @@ class CalibrationSystem {
         // 停止计时器，避免重复触发
         this.stopTimer();
 
+        // 如果没有样本，使用默认值而不是重试（避免无限循环）
         if (this.samples.length === 0) {
-            console.warn('No valid samples collected, retrying...');
-            this.sampleStartTime = Date.now();
-            this.startTimer();
-            return;
+            console.warn('No valid samples collected, using default value');
+
+            if (this.calibrationStep === 1) {
+                // 使用默认低音 (C3)
+                this.calibrationData.lowestFreq = 130.81;
+                this.calibrationData.lowestNote = 'C3';
+                console.log('Using default lowest pitch: C3 (130.81 Hz)');
+            } else if (this.calibrationStep === 2) {
+                // 使用默认高音 (C5)
+                this.calibrationData.highestFreq = 523.25;
+                this.calibrationData.highestNote = 'C5';
+                console.log('Using default highest pitch: C5 (523.25 Hz)');
+            }
         }
 
         if (this.calibrationStep === 1) {
-            // 完成低音检测
-            this.calibrationData.lowestFreq = this.getMedianFrequency(this.samples);
-            this.calibrationData.lowestNote = pitchDetector.frequencyToNote(
-                this.calibrationData.lowestFreq
-            ).fullNote;
+            // 完成低音检测（如果有样本）
+            if (this.samples.length > 0) {
+                this.calibrationData.lowestFreq = this.getMedianFrequency(this.samples);
+                this.calibrationData.lowestNote = pitchDetector.frequencyToNote(
+                    this.calibrationData.lowestFreq
+                ).fullNote;
 
-            console.log('Step 1 complete - Lowest pitch:', this.calibrationData.lowestNote,
-                '(', this.calibrationData.lowestFreq.toFixed(2), 'Hz)');
+                console.log('Step 1 complete - Lowest pitch:', this.calibrationData.lowestNote,
+                    '(', this.calibrationData.lowestFreq.toFixed(2), 'Hz)');
+            }
 
-            // 进入下一步
+            // 无论有无样本，都进入Step 2（关键修复）
             this.calibrationStep = 2;
             this.samples = [];
             this.sampleStartTime = Date.now();
@@ -173,16 +185,18 @@ class CalibrationSystem {
             }
 
         } else if (this.calibrationStep === 2) {
-            // 完成高音检测
-            this.calibrationData.highestFreq = this.getMedianFrequency(this.samples);
-            this.calibrationData.highestNote = pitchDetector.frequencyToNote(
-                this.calibrationData.highestFreq
-            ).fullNote;
+            // 完成高音检测（如果有样本）
+            if (this.samples.length > 0) {
+                this.calibrationData.highestFreq = this.getMedianFrequency(this.samples);
+                this.calibrationData.highestNote = pitchDetector.frequencyToNote(
+                    this.calibrationData.highestFreq
+                ).fullNote;
 
-            console.log('Step 2 complete - Highest pitch:', this.calibrationData.highestNote,
-                '(', this.calibrationData.highestFreq.toFixed(2), 'Hz)');
+                console.log('Step 2 complete - Highest pitch:', this.calibrationData.highestNote,
+                    '(', this.calibrationData.highestFreq.toFixed(2), 'Hz)');
+            }
 
-            // 完成校准
+            // 无论有无样本，都完成校准（关键修复）
             this.finishCalibration();
         }
     }

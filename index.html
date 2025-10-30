@@ -193,11 +193,23 @@
         window.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 const issues = [];
+
+                // 检查Tone.js
                 if (typeof Tone === 'undefined') {
                     issues.push('Tone.js 库加载失败');
                 }
-                if (typeof Pitchfinder === 'undefined') {
+
+                // 检查Pitchfinder (支持多种可能的全局变量名)
+                const hasPitchfinder = typeof Pitchfinder !== 'undefined' ||
+                                      typeof pitchfinder !== 'undefined';
+
+                if (!hasPitchfinder) {
                     issues.push('Pitchfinder 库加载失败');
+                    console.error('Pitchfinder not found. Available globals:',
+                                 Object.keys(window).filter(k => k.toLowerCase().includes('pitch')));
+                } else {
+                    console.log('Pitchfinder loaded successfully as:',
+                               typeof Pitchfinder !== 'undefined' ? 'Pitchfinder' : 'pitchfinder');
                 }
 
                 if (issues.length > 0) {
@@ -214,6 +226,8 @@
                         warningDiv.classList.remove('hidden');
                     }
                     console.error('Library loading failed:', issues);
+                } else {
+                    console.log('✓ All libraries loaded successfully!');
                 }
             }, 1000);
         });

@@ -26,16 +26,27 @@ class PitchDetector {
     initialize(sampleRate) {
         this.sampleRate = sampleRate;
 
+        // 检查Pitchfinder库是否加载
+        const PitchfinderLib = window.Pitchfinder || window.pitchfinder;
+
+        if (!PitchfinderLib) {
+            console.error('Pitchfinder library not loaded!');
+            console.error('Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('pitch')));
+            throw new Error('音高检测库未加载，请检查网络连接或刷新页面');
+        }
+
         // 使用pitchfinder库的YIN算法
-        if (typeof Pitchfinder !== 'undefined') {
-            this.detector = Pitchfinder.YIN({
+        try {
+            this.detector = PitchfinderLib.YIN({
                 sampleRate: this.sampleRate,
                 threshold: this.threshold
             });
-            console.log('YIN pitch detector initialized with sample rate:', this.sampleRate);
-        } else {
-            console.error('Pitchfinder library not loaded!');
-            throw new Error('音高检测库未加载');
+            console.log('YIN pitch detector initialized successfully');
+            console.log('Sample rate:', this.sampleRate);
+            console.log('Threshold:', this.threshold);
+        } catch (error) {
+            console.error('Failed to create YIN detector:', error);
+            throw new Error('无法创建音高检测器: ' + error.message);
         }
     }
 

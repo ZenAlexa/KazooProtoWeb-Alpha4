@@ -6,6 +6,10 @@ class KazooApp {
     constructor() {
         this.isRunning = false;
 
+        // Phase 2: 双引擎模式
+        this.useContinuousMode = true;  // 默认使用新引擎
+        this.currentEngine = null;      // 当前激活的引擎
+
         // UI元素
         this.ui = {
             startBtn: document.getElementById('startBtn'),
@@ -15,6 +19,10 @@ class KazooApp {
             helpContent: document.getElementById('helpContent'),
             warningBox: document.getElementById('warningBox'),
             warningText: document.getElementById('warningText'),
+
+            // Phase 2: 模式切换
+            modeToggle: document.getElementById('modeToggle'),
+            modeText: document.getElementById('modeText'),
 
             // 状态徽章
             instrumentStatus: document.getElementById('instrumentStatus'),
@@ -77,6 +85,16 @@ class KazooApp {
         this.ui.startBtn.addEventListener('click', () => this.start());
         this.ui.stopBtn.addEventListener('click', () => this.stop());
 
+        // Phase 2: 模式切换
+        this.ui.modeToggle.addEventListener('change', (e) => {
+            if (this.isRunning) {
+                alert('Please stop playback before switching modes.');
+                e.target.checked = this.useContinuousMode;
+                return;
+            }
+            this.switchMode(e.target.checked);
+        });
+
         // 乐器选择
         this.ui.instrumentBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -88,9 +106,9 @@ class KazooApp {
                 const instrumentName = e.currentTarget.querySelector('.instrument-name').textContent;
                 this.ui.instrumentStatus.textContent = instrumentName;
 
-                // 如果合成器已初始化，切换乐器
-                if (synthesizerEngine.currentSynth) {
-                    synthesizerEngine.changeInstrument(instrument);
+                // 如果合成器已初始化，切换乐器（使用当前引擎）
+                if (this.currentEngine && this.currentEngine.currentSynth) {
+                    this.currentEngine.changeInstrument(instrument);
                 }
             });
         });
@@ -106,11 +124,21 @@ class KazooApp {
     }
 
     /**
+     * Phase 2: 切换引擎模式
+     */
+    switchMode(useContinuous) {
+        this.useContinuousMode = useContinuous;
+        this.ui.modeText.textContent = useContinuous ? 'Continuous' : 'Legacy';
+
+        console.log(`[Mode Switch] ${useContinuous ? 'Continuous' : 'Legacy'} mode activated`);
+    }
+
+    /**
      * 开始播放
      */
     async start() {
         try {
-            console.log('Starting Kazoo Proto...');
+            console.log(`Starting Kazoo Proto in ${this.useContinuousMode ? 'Continuous' : 'Legacy'} mode...`);
 
             // 初始化音频系统
             if (!audioInputManager.audioContext) {
@@ -118,16 +146,33 @@ class KazooApp {
                 await audioInputManager.initialize();
             }
 
-            // 初始化合成器
-            if (!synthesizerEngine.currentSynth) {
-                console.log('Initializing synthesizer...');
-                await synthesizerEngine.initialize();
+            // Phase 2: 选择引擎
+            if (this.useContinuousMode) {
+                this.currentEngine = continuousSynthEngine;
+                console.log('Using Continuous Frequency Engine');
+            } else {
+                this.currentEngine = synthesizerEngine;
+                console.log('Using Legacy Note-Based Engine');
+            }
+
+            // 初始化选中的引擎
+            if (!this.currentEngine.currentSynth) {
+                console.log('Initializing synthesizer engine...');
+                await this.currentEngine.initialize();
             }
 
             // 初始化音高检测
             if (!pitchDetector.detector) {
                 console.log('Initializing pitch detector...');
                 pitchDetector.initialize(audioInputManager.audioContext.sampleRate);
+            }
+
+            // 初始化性能监控
+            if (!performanceMonitor.metrics.sampleRate) {
+                await performanceMonitor.initialize(
+                    audioInputManager.audioContext,
+                    audioInputManager.config.bufferSize
+                );
             }
 
             // 启动麦克风
@@ -143,7 +188,7 @@ class KazooApp {
             this.ui.stopBtn.classList.remove('hidden');
             this.ui.statusBar.classList.remove('hidden');
             this.ui.visualizer.classList.remove('hidden');
-            this.ui.systemStatus.textContent = 'Running';
+            this.ui.systemStatus.textContent = `Running (${this.useContinuousMode ? 'Continuous' : 'Legacy'})`;
             this.ui.systemStatus.classList.add('active');
             this.ui.recordingStatus.textContent = 'Playing';
             this.ui.recordingStatus.classList.add('status-ready');
@@ -165,7 +210,15 @@ class KazooApp {
 
         // 停止音频
         audioInputManager.stop();
-        synthesizerEngine.stopNote();
+
+        // Phase 2: 停止当前引擎
+        if (this.currentEngine) {
+            if (this.useContinuousMode) {
+                this.currentEngine.stop();
+            } else {
+                this.currentEngine.stopNote();
+            }
+        }
 
         // 更新UI
         this.ui.startBtn.classList.remove('hidden');
@@ -179,9 +232,14 @@ class KazooApp {
     }
 
     /**
-     * 音频处理 - 直接处理，无校准
+     * 音频处理 - Phase 2: 根据模式使用不同引擎
      */
     onAudioProcess(audioBuffer) {
+        if (!this.isRunning || !this.currentEngine) return;
+
+        // 性能监控开始
+        performanceMonitor.startProcessing();
+
         const volume = audioInputManager.getVolume(audioBuffer);
         const pitchInfo = pitchDetector.detect(audioBuffer, volume);
 
@@ -191,20 +249,20 @@ class KazooApp {
             this.ui.currentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
             this.ui.confidence.textContent = `${Math.round(pitchInfo.confidence * 100)}%`;
 
-            // 驱动合成器发声
-            synthesizerEngine.processPitch(pitchInfo);
+            // Phase 2: 驱动当前引擎发声
+            this.currentEngine.processPitch(pitchInfo);
 
             // 可视化
             this.updateVisualizer(pitchInfo);
-
-            // 更新性能监控
-            performanceMonitor.updateFPS();
-            const metrics = performanceMonitor.getMetrics();
-            this.ui.latency.textContent = `${metrics.totalLatency}ms`;
-        } else {
-            // 没有音高，停止发声
-            synthesizerEngine.stopNote();
         }
+
+        // 性能监控结束
+        performanceMonitor.endProcessing();
+
+        // 更新性能指标
+        performanceMonitor.updateFPS();
+        const metrics = performanceMonitor.getMetrics();
+        this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
     /**

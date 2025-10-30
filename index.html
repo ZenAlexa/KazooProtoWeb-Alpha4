@@ -12,6 +12,16 @@
         <div class="navbar-content">
             <div class="navbar-brand">Kazoo Proto</div>
             <div class="navbar-actions">
+                <!-- 模式切换开关 (Phase 2 A/B Testing) -->
+                <div class="mode-switcher">
+                    <span class="mode-label">Mode:</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="modeToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="mode-text" id="modeText">Continuous</span>
+                    <span class="beta-badge">BETA</span>
+                </div>
                 <button class="btn-text" id="helpBtn">Help</button>
             </div>
         </div>
@@ -166,8 +176,15 @@
                 <ul style="margin-left: 20px; margin-bottom: 16px;">
                     <li>🎧 Use headphones to prevent feedback (or you'll create an infinite echo loop!)</li>
                     <li>📏 Keep microphone 10-20cm away (close enough to hear, far enough not to eat it)</li>
-                    <li>🎵 Sing steady notes rather than sliding (we're not a theremin... yet!)</li>
+                    <li>🎵 Try both modes! Continuous = smooth slides, Legacy = clear notes</li>
                     <li>🤫 Quiet environment works best (your cat's meowing won't become music... unfortunately)</li>
+                </ul>
+
+                <h4 style="margin-bottom: 12px;">🎛️ Mode Comparison (NEW!)</h4>
+                <ul style="margin-left: 20px; margin-bottom: 16px;">
+                    <li>🌊 <strong>Continuous Mode (Default):</strong> Smooth pitch tracking, follows your voice like a theremin. Perfect for expressive playing and slides!</li>
+                    <li>🎹 <strong>Legacy Mode:</strong> Snap-to-note system, like a piano keyboard. Better for precise, discrete notes.</li>
+                    <li>🔄 Switch anytime using the toggle in the top-right corner (stop playback first!)</li>
                 </ul>
 
                 <h4 style="margin-bottom: 12px;">🎭 Fun Facts</h4>
@@ -206,6 +223,7 @@
     <script src="js/audio-input.js"></script>
     <script src="js/pitch-detector.js"></script>
     <script src="js/synthesizer.js"></script>
+    <script src="js/continuous-synth.js"></script> <!-- Phase 2: New engine -->
     <script src="js/performance.js"></script>
     <script src="js/main.js"></script>
     <!-- 注意：不再加载 calibration.js -->

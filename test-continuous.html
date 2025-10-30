@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Frequency Synth - Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+
+        .test-section {
+            background: #f7f9fc;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .test-section h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .btn-secondary.active {
+            background: #667eea;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .metric {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status.playing {
+            background: #10b981;
+            color: white;
+        }
+
+        .status.stopped {
+            background: #ef4444;
+            color: white;
+        }
+
+        .log {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+
+        .log-entry.success {
+            color: #10b981;
+        }
+
+        .log-entry.error {
+            color: #ef4444;
+        }
+
+        .log-entry.info {
+            color: #3b82f6;
+        }
+
+        .instrument-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .comparison-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .comparison-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .comparison-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Continuous Frequency Synthesizer</h1>
+        <p class="subtitle">Phase 1 Testing: Real-time Pitch Tracking Prototype</p>
+
+        <!-- Test Section 1: Basic Controls -->
+        <div class="test-section">
+            <h2>
+                <span>🎮</span> 基础控制
+                <span class="status stopped" id="status">Stopped</span>
+            </h2>
+            <div class="controls">
+                <button class="btn-primary" id="startBtn">Start</button>
+                <button class="btn-danger" id="stopBtn" disabled>Stop</button>
+            </div>
+        </div>
+
+        <!-- Test Section 2: Instrument Selection -->
+        <div class="test-section">
+            <h2><span>🎷</span> 选择乐器</h2>
+            <div class="instrument-grid">
+                <button class="btn-secondary active" data-instrument="saxophone">Saxophone</button>
+                <button class="btn-secondary" data-instrument="violin">Violin</button>
+                <button class="btn-secondary" data-instrument="piano">Piano</button>
+                <button class="btn-secondary" data-instrument="flute">Flute</button>
+                <button class="btn-secondary" data-instrument="guitar">Guitar</button>
+                <button class="btn-secondary" data-instrument="synth">Synth</button>
+            </div>
+        </div>
+
+        <!-- Test Section 3: Real-time Metrics -->
+        <div class="test-section">
+            <h2><span>📊</span> 实时性能指标</h2>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">当前频率</div>
+                    <div class="metric-value" id="currentFreq">0 Hz</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">置信度</div>
+                    <div class="metric-value" id="confidence">0%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">更新次数</div>
+                    <div class="metric-value" id="updateCount">0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">平均延迟</div>
+                    <div class="metric-value" id="avgLatency">0 ms</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">音频延迟</div>
+                    <div class="metric-value" id="audioLatency">0 ms</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">当前乐器</div>
+                    <div class="metric-value" id="instrument" style="font-size: 16px;">Saxophone</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Section 4: System Comparison -->
+        <div class="test-section">
+            <h2><span>⚖️</span> 系统对比 <span class="badge">Phase 1 Goal</span></h2>
+            <div class="comparison">
+                <div class="comparison-item">
+                    <div class="comparison-label">旧系统（离散音符）</div>
+                    <div class="comparison-value">~30ms</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 8px;">阶梯式音高变化</div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label">新系统（连续频率）</div>
+                    <div class="comparison-value" id="newSystemLatency">TBD</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 8px;">平滑音高跟踪</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Section 5: Console Log -->
+        <div class="test-section">
+            <h2><span>📋</span> 系统日志</h2>
+            <div class="log" id="logContainer">
+                <div class="log-entry info">System ready. Click "Start" to begin testing...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load dependencies -->
+    <script src="js/lib/tone.js"></script>
+    <script src="js/lib/pitchfinder-browser.js"></script>
+    <script src="js/audio-input.js"></script>
+    <script src="js/pitch-detector.js"></script>
+    <script src="js/continuous-synth.js"></script>
+    <script src="js/performance.js"></script>
+
+    <!-- Test Application Logic -->
+    <script>
+        class ContinuousSynthTestApp {
+            constructor() {
+                this.isRunning = false;
+                this.metricsInterval = null;
+
+                // UI Elements
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.statusEl = document.getElementById('status');
+                this.logContainer = document.getElementById('logContainer');
+
+                // Metrics Elements
+                this.currentFreqEl = document.getElementById('currentFreq');
+                this.confidenceEl = document.getElementById('confidence');
+                this.updateCountEl = document.getElementById('updateCount');
+                this.avgLatencyEl = document.getElementById('avgLatency');
+                this.audioLatencyEl = document.getElementById('audioLatency');
+                this.instrumentEl = document.getElementById('instrument');
+                this.newSystemLatencyEl = document.getElementById('newSystemLatency');
+
+                this.bindEvents();
+                this.log('✓ Test application initialized', 'success');
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.start());
+                this.stopBtn.addEventListener('click', () => this.stop());
+
+                // Instrument selection
+                document.querySelectorAll('[data-instrument]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-instrument]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        const instrument = e.target.dataset.instrument;
+                        continuousSynthEngine.changeInstrument(instrument);
+                        this.instrumentEl.textContent = instrument.charAt(0).toUpperCase() + instrument.slice(1);
+                        this.log(`Instrument changed: ${instrument}`, 'info');
+                    });
+                });
+            }
+
+            async start() {
+                try {
+                    this.log('Starting audio systems...', 'info');
+
+                    // Initialize systems
+                    await audioInputManager.initialize();
+                    await pitchDetector.initialize(audioInputManager.audioContext.sampleRate);
+                    await continuousSynthEngine.initialize();
+                    await performanceMonitor.initialize(audioInputManager.audioContext);
+
+                    // Start microphone
+                    await audioInputManager.startMicrophone();
+
+                    // Set up audio processing callback
+                    audioInputManager.onAudioProcess = this.onAudioProcess.bind(this);
+
+                    this.isRunning = true;
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.statusEl.textContent = 'Playing';
+                    this.statusEl.className = 'status playing';
+
+                    // Start metrics update
+                    this.metricsInterval = setInterval(() => this.updateMetrics(), 100);
+
+                    this.log('✓ Audio processing started', 'success');
+                } catch (error) {
+                    this.log(`❌ Error: ${error.message}`, 'error');
+                    console.error(error);
+                }
+            }
+
+            stop() {
+                audioInputManager.stop();
+                continuousSynthEngine.stop();
+
+                if (this.metricsInterval) {
+                    clearInterval(this.metricsInterval);
+                }
+
+                this.isRunning = false;
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                this.statusEl.textContent = 'Stopped';
+                this.statusEl.className = 'status stopped';
+
+                this.log('■ Stopped', 'info');
+            }
+
+            onAudioProcess(audioBuffer) {
+                if (!this.isRunning) return;
+
+                // Start performance measurement
+                performanceMonitor.startProcessing();
+
+                const volume = audioInputManager.getVolume(audioBuffer);
+                const pitchInfo = pitchDetector.detect(audioBuffer, volume);
+
+                if (pitchInfo) {
+                    // Process with continuous synth engine
+                    continuousSynthEngine.processPitch(pitchInfo);
+                }
+
+                // End performance measurement
+                performanceMonitor.endProcessing();
+            }
+
+            updateMetrics() {
+                // Get synth metrics
+                const synthMetrics = continuousSynthEngine.getPerformanceMetrics();
+                const perfMetrics = performanceMonitor.getMetrics();
+
+                // Update UI
+                this.currentFreqEl.textContent = `${synthMetrics.currentFrequency} Hz`;
+                this.updateCountEl.textContent = synthMetrics.totalUpdates;
+                this.avgLatencyEl.textContent = `${synthMetrics.averageUpdateLatency} ms`;
+
+                // Audio latency
+                const totalLatency = perfMetrics.latency ? perfMetrics.latency.total : 0;
+                this.audioLatencyEl.textContent = `${totalLatency.toFixed(1)} ms`;
+                this.newSystemLatencyEl.textContent = `${totalLatency.toFixed(1)} ms`;
+
+                // Confidence (would need to store last pitchInfo)
+                // For now, show if playing
+                this.confidenceEl.textContent = synthMetrics.isPlaying ? '>1%' : '0%';
+            }
+
+            log(message, type = 'info') {
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                this.logContainer.appendChild(entry);
+                this.logContainer.scrollTop = this.logContainer.scrollHeight;
+
+                // Keep only last 50 entries
+                while (this.logContainer.children.length > 50) {
+                    this.logContainer.removeChild(this.logContainer.firstChild);
+                }
+            }
+        }
+
+        // Initialize test app
+        const testApp = new ContinuousSynthTestApp();
+    </script>
+</body>
+</html>

@@ -54,6 +54,12 @@ body {
     color: var(--gray-900);
 }
 
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
 .btn-text {
     background: none;
     border: none;
@@ -66,6 +72,85 @@ body {
 }
 
 .btn-text:hover { background: var(--gray-100); }
+
+/* 模式切换器 (Phase 2) */
+.mode-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--gray-50);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.mode-label {
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.mode-text {
+    color: var(--gray-900);
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.beta-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--gray-300);
+    border-radius: 24px;
+    transition: 0.3s;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
 
 /* Hero - 居中设计 */
 .hero {

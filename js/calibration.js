@@ -152,9 +152,13 @@ class CalibrationSystem {
      * 完成当前步骤
      */
     completeCurrentStep() {
+        // 停止计时器，避免重复触发
+        this.stopTimer();
+
         if (this.samples.length === 0) {
             console.warn('No valid samples collected, retrying...');
             this.sampleStartTime = Date.now();
+            this.startTimer();
             return;
         }
 
@@ -165,7 +169,7 @@ class CalibrationSystem {
                 this.calibrationData.lowestFreq
             ).fullNote;
 
-            console.log('Lowest pitch detected:', this.calibrationData.lowestNote,
+            console.log('Step 1 complete - Lowest pitch:', this.calibrationData.lowestNote,
                 '(', this.calibrationData.lowestFreq.toFixed(2), 'Hz)');
 
             // 进入下一步
@@ -192,7 +196,7 @@ class CalibrationSystem {
                 this.calibrationData.highestFreq
             ).fullNote;
 
-            console.log('Highest pitch detected:', this.calibrationData.highestNote,
+            console.log('Step 2 complete - Highest pitch:', this.calibrationData.highestNote,
                 '(', this.calibrationData.highestFreq.toFixed(2), 'Hz)');
 
             // 完成校准

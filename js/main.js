@@ -23,8 +23,9 @@ class KazooApp {
             modalDescription: document.getElementById('modalDescription'),
             progressFill: document.getElementById('progressFill'),
             progressText: document.getElementById('progressText'),
+            modalCurrentNote: document.getElementById('modalCurrentNote'),
+            modalCurrentFreq: document.getElementById('modalCurrentFreq'),
             cancelCalibrationBtn: document.getElementById('cancelCalibrationBtn'),
-            nextStepBtn: document.getElementById('nextStepBtn'),
 
             // 状态和可视化
             statusBar: document.getElementById('statusBar'),
@@ -169,9 +170,9 @@ class KazooApp {
         if (pitchInfo) {
             calibrationSystem.processPitch(pitchInfo);
 
-            // 更新显示
-            this.ui.currentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
-            this.ui.currentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
+            // 更新模态弹窗中的音符显示
+            this.ui.modalCurrentNote.textContent = `${pitchInfo.note}${pitchInfo.octave}`;
+            this.ui.modalCurrentFreq.textContent = `${pitchInfo.frequency.toFixed(1)} Hz`;
         }
     }
 
@@ -213,11 +214,23 @@ class KazooApp {
 
         // 更新UI状态
         this.isCalibrated = true;
-        this.ui.calibrateBtn.textContent = 'Recalibrate';
+        this.ui.calibrateBtn.textContent = 'Recalibrate Voice';
         this.ui.startBtn.classList.remove('hidden');
 
         console.log('Calibration complete:', data);
-        alert(`Calibration complete!\nVocal range: ${lowestNote} - ${highestNote} (${range.semitones} semitones)`);
+
+        // 显示完成信息和下一步指引
+        alert(`✓ Calibration Complete!
+
+Your vocal range: ${lowestNote} - ${highestNote}
+Range: ${range.semitones} semitones (${range.octaves.toFixed(1)} octaves)
+
+The system now knows your voice range and will accurately convert your humming to instrument notes within this range.
+
+Next steps:
+1. Choose an instrument below
+2. Click "Start Recording"
+3. Hum or sing - you'll hear it as the chosen instrument!`);
     }
 
     /**

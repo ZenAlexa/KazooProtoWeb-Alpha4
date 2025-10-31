@@ -424,7 +424,20 @@ class AudioIO {
                 break;
 
             case 'pitch-detected':
-                // 传递音高检测结果到专用回调
+                // Phase 1: 传递音高检测结果到专用回调
+                if (this.onPitchDetectedCallback) {
+                    this.onPitchDetectedCallback(data);
+                }
+                this.stats.pitchDetections = (this.stats.pitchDetections || 0) + 1;
+                break;
+
+            case 'pitch-frame':
+                // Phase 2.9: 完整 PitchFrame 数据 (11 字段)
+                // 传递到 onFrameCallback (主要) 和 onPitchDetectedCallback (兼容)
+                if (this.onFrameCallback) {
+                    this.onFrameCallback(data, data.timestamp || performance.now());
+                }
+                // 向后兼容: 也触发 onPitchDetectedCallback
                 if (this.onPitchDetectedCallback) {
                     this.onPitchDetectedCallback(data);
                 }

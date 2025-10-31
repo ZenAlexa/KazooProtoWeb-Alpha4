@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "npx serve . -p 3000",
     "start": "npx serve . -p 3000",
+    "test": "node tests/run-all-tests.js",
+    "test:report": "node tests/run-all-tests.js --report",
+    "test:watch": "nodemon --watch tests --watch js/features tests/run-all-tests.js",
     "deploy": "vercel --prod"
   },
   "repository": {

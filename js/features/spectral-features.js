@@ -87,6 +87,40 @@ export class SpectralFeatures {
   }
 
   /**
+   * 延迟注入音频源节点 (用于 AnalyserNode 连接)
+   *
+   * 在 AudioIO 初始化后调用此方法，启用原生 FFT 加速
+   *
+   * @param {AudioNode} sourceNode - 音频源节点
+   * @returns {boolean} 是否成功启用 AnalyserNode
+   */
+  setSourceNode(sourceNode) {
+    if (!this.audioContext) {
+      console.warn('[SpectralFeatures] ⚠️ 无 audioContext，无法启用 AnalyserNode');
+      return false;
+    }
+
+    if (this.analyser) {
+      console.warn('[SpectralFeatures] ⚠️ AnalyserNode 已存在，跳过重复设置');
+      return true;
+    }
+
+    try {
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = this.fftSize;
+      this.analyser.smoothingTimeConstant = 0;  // 禁用内置平滑
+      sourceNode.connect(this.analyser);
+      this.useNativeFFT = true;
+      console.log('[SpectralFeatures] ✅ 已启用原生 AnalyserNode FFT (延迟注入)');
+      return true;
+    } catch (error) {
+      console.error('[SpectralFeatures] ❌ AnalyserNode 创建失败:', error);
+      this.useNativeFFT = false;
+      return false;
+    }
+  }
+
+  /**
    * 分析音频缓冲区，提取频域特征
    *
    * @param {Float32Array} audioBuffer - 音频数据

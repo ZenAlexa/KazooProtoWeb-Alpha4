@@ -308,6 +308,16 @@ class KazooApp {
                 bufferSize: bufferSize,
                 mode: mode
             });
+
+            // Phase 2.5: 注入 sourceNode 启用 AnalyserNode FFT (仅 AudioIO 模式)
+            if (this.useAudioIO && this.audioIO && this.audioIO.sourceNode) {
+                const success = this.expressiveFeatures.setSourceNode(this.audioIO.sourceNode);
+                if (success) {
+                    console.log('✅ [Phase 2.5] AnalyserNode FFT 已启用 (原生加速)');
+                } else {
+                    console.warn('⚠️ [Phase 2.5] AnalyserNode FFT 启用失败，继续使用纯 JS FFT');
+                }
+            }
         }
     }
 

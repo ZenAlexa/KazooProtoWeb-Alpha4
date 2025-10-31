@@ -165,6 +165,21 @@ export class ExpressiveFeatures {
   }
 
   /**
+   * 设置音频源节点 (延迟注入，用于启用 AnalyserNode FFT)
+   *
+   * 在 AudioIO 初始化完成后调用此方法，可将 SpectralFeatures 从纯 JS FFT 升级到原生 FFT
+   *
+   * @param {AudioNode} sourceNode - 音频源节点 (来自 AudioIO)
+   * @returns {boolean} 是否成功启用 AnalyserNode
+   */
+  setSourceNode(sourceNode) {
+    if (this.spectralFeatures) {
+      return this.spectralFeatures.setSourceNode(sourceNode);
+    }
+    return false;
+  }
+
+  /**
    * 重置状态
    */
   reset() {

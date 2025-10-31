@@ -222,9 +222,10 @@ release → silence (静音 > 100ms)
   - 优雅降级 (缓存上一次结果)
 
 **技术亮点**:
-- ✅ 双路 FFT 架构:
-  - 浏览器环境: AnalyserNode (原生 FFT，5-10x 加速)
-  - Node.js 测试: AudioUtils.performSimpleFFT() (纯 JS FFT)
+- ✅ 双路 FFT 架构 (接口已实现，Phase 2.5补丁已启用):
+  - 浏览器环境: AnalyserNode (原生 FFT，5-10x 加速) - ✅ 已通过 setSourceNode() 启用
+  - Node.js 测试: AudioUtils.performSimpleFFT() (纯 JS FFT) - ✅ 测试通过
+  - 延迟注入机制: main.js 在 AudioIO 启动后调用 expressiveFeatures.setSourceNode()
 - ✅ FFT 降频优化: fftInterval=2 → 减少 50% CPU 消耗
 - ✅ 频域特征计算:
   - Spectral Centroid: 加权平均频率 Σ(f[i] * magnitude[i]) / Σ(magnitude[i])
@@ -290,8 +291,20 @@ release → silence (静音 > 100ms)
 - ✅ 在 process() 中调用 spectralFeatures.analyze(audioBuffer)
 - ✅ 错误处理: try-catch + 降级到默认值
 - ✅ reset() 和 getStats() 集成
+- ✅ 延迟注入 sourceNode: 通过 setSourceNode() 方法启用 AnalyserNode (Phase 2.5补丁)
 
-**交付物评估**: ✅ 完整且通过全部测试
+**Phase 2.5 补丁 (2025-10-31)**:
+- ✅ 添加 SpectralFeatures.setSourceNode() 方法 (支持延迟注入)
+- ✅ 添加 ExpressiveFeatures.setSourceNode() 代理方法
+- ✅ main.js 在 _initializeEngines() 中调用 setSourceNode(audioIO.sourceNode)
+- ✅ 浏览器环境现在会自动启用 AnalyserNode FFT (5-10x 加速)
+
+**已知限制**:
+- ⚠️ **Phase 2.6 待完成**: SmoothingFilters、OnsetDetector 尚未集成
+- ⚠️ **占位值**: pitchStability、articulation、attackTime 仍为固定值
+- ⚠️ **Worklet 路径**: 默认禁用 (useWorklet: false)，Phase 2.7 再处理 buffer 传递
+
+**交付物评估**: ✅ 完整且通过全部测试 (含补丁修正)
 
 ---
 

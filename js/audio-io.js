@@ -429,7 +429,7 @@ class AudioIO {
      * @private
      */
     _handleWorkletMessage(event) {
-        const { type, data } = event.data;
+        const { type, data, timestamp } = event.data;
 
         switch (type) {
             case 'ready':
@@ -446,17 +446,20 @@ class AudioIO {
 
             case 'pitch-frame':
                 // Phase 2.9: 完整 PitchFrame 数据 (11 字段)
-                // 优先使用专用 Worklet 回调，避免与 ScriptProcessor 路径冲突
+                // 使用 Worklet 提供的精确 timestamp (AudioContext.currentTime * 1000)
+                const frameTimestamp = timestamp || performance.now();
+
+                // Worklet 模式: 单一数据出口，避免重复处理
                 if (this.onWorkletPitchFrameCallback) {
-                    this.onWorkletPitchFrameCallback(data, data.timestamp || performance.now());
+                    // 专用回调优先 (推荐)
+                    this.onWorkletPitchFrameCallback(data, frameTimestamp);
                 } else if (this.onFrameCallback) {
                     // Fallback: 如果未注册专用回调，使用通用 onFrame
-                    this.onFrameCallback(data, data.timestamp || performance.now());
+                    console.warn('[AudioIO] ⚠️ pitch-frame 未注册专用回调，使用 onFrame fallback');
+                    this.onFrameCallback(data, frameTimestamp);
                 }
-                // 向后兼容: 也触发 onPitchDetectedCallback (可选)
-                if (this.onPitchDetectedCallback) {
-                    this.onPitchDetectedCallback(data);
-                }
+                // 注意: 不再触发 onPitchDetectedCallback，避免双重处理
+
                 this.stats.pitchDetections = (this.stats.pitchDetections || 0) + 1;
                 break;
 

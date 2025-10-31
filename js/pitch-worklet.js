@@ -531,9 +531,11 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                             this.stats.pitchDetections++;
 
                             // Phase 2.9: 发送完整 PitchFrame 到主线程
+                            // 附加 Worklet currentTime (转换为毫秒) 用于精确时序追踪
                             this.port.postMessage({
                                 type: 'pitch-frame',  // 新消息类型
-                                data: pitchInfo
+                                data: pitchInfo,
+                                timestamp: currentTime * 1000  // AudioContext.currentTime (秒) → 毫秒
                             });
 
                             // Phase 1 兼容: 保留旧消息类型 (便于回退)
@@ -718,7 +720,8 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         const roundedHalfSteps = Math.round(halfSteps);
 
         // 计算音符和八度
-        const noteIndex = roundedHalfSteps % 12;
+        // 修复: 负数取模仍为负，需要归一化到 0-11
+        const noteIndex = ((roundedHalfSteps % 12) + 12) % 12;
         const octave = Math.floor(roundedHalfSteps / 12);
 
         // 计算音分偏差 (cents)

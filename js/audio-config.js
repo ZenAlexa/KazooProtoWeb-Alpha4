@@ -6,7 +6,7 @@
  * 提取配置常量，便于 AudioWorklet 迁移和 A/B 测试
  */
 
-export const AUDIO_CONFIG = {
+const AUDIO_CONFIG = {
     // === 采样配置 ===
     SAMPLE_RATE: 44100,  // Hz - 与 Dubler 2 保持一致
 
@@ -67,7 +67,7 @@ export const AUDIO_CONFIG = {
  * 获取推荐的 Buffer Size
  * 根据浏览器能力返回最佳配置
  */
-export function getRecommendedBufferSize(useWorklet = true) {
+function getRecommendedBufferSize(useWorklet = true) {
     if (!useWorklet) {
         return AUDIO_CONFIG.BUFFER_SIZE_LEGACY;
     }
@@ -86,14 +86,14 @@ export function getRecommendedBufferSize(useWorklet = true) {
 /**
  * 计算理论延迟
  */
-export function calculateTheoreticalLatency(bufferSize, sampleRate) {
+function calculateTheoreticalLatency(bufferSize, sampleRate) {
     return (bufferSize / sampleRate) * 1000; // ms
 }
 
 /**
  * 检查浏览器是否支持 AudioWorklet
  */
-export function supportsAudioWorklet() {
+function supportsAudioWorklet() {
     try {
         if (typeof AudioWorkletNode === 'undefined') {
             return false;
@@ -119,7 +119,7 @@ export function supportsAudioWorklet() {
 /**
  * 获取浏览器信息
  */
-export function getBrowserInfo() {
+function getBrowserInfo() {
     const ua = navigator.userAgent;
     let browser = 'Unknown';
     let version = 0;
@@ -144,7 +144,7 @@ export function getBrowserInfo() {
 /**
  * 验证浏览器兼容性
  */
-export function validateBrowserCompatibility() {
+function validateBrowserCompatibility() {
     const { browser, version } = getBrowserInfo();
     const support = AUDIO_CONFIG.BROWSER_SUPPORT;
     const issues = [];
@@ -176,7 +176,7 @@ export function validateBrowserCompatibility() {
 /**
  * 打印配置信息 (用于调试)
  */
-export function logAudioConfig() {
+function logAudioConfig() {
     if (!AUDIO_CONFIG.DEBUG.LOG_AUDIO_EVENTS) return;
 
     const compat = validateBrowserCompatibility();

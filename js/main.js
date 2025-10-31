@@ -190,12 +190,12 @@ class KazooApp {
             this.audioIO = new AudioIO();
 
             // 配置 AudioIO
-            // Phase 2 注意: 当前 ExpressiveFeatures 需要完整 audioBuffer
-            // Worklet 模式暂时禁用，Phase 2.7 再完整实现
+            // Phase 2.9: AudioWorklet 路径恢复完成
+            // Worklet 端已实现完整 ExpressiveFeatures (FFT + EMA + OnsetDetector)
             this.audioIO.configure({
-                useWorklet: false,          // Phase 2: 暂时禁用 (等待 Phase 2.7)
+                useWorklet: true,           // Phase 2.9: 启用 AudioWorklet 低延迟模式
                 workletBufferSize: 128,     // 低延迟目标 (2.9ms @ 44.1kHz)
-                bufferSize: 2048,           // ScriptProcessor (Phase 2 默认)
+                bufferSize: 2048,           // ScriptProcessor (回退模式)
                 workletFallback: true,      // 自动回退到 ScriptProcessor
                 sampleRate: 44100,
                 latencyHint: 'interactive',

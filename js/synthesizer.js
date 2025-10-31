@@ -391,8 +391,23 @@ class SynthesizerEngine {
         // 临时调试: 打印前5次状态变化
         if (!this._articulationCallCount) this._articulationCallCount = 0;
         if (this._articulationCallCount < 5) {
-            console.log(`[Synthesizer] 🔍 handleArticulation #${this._articulationCallCount}: ${prevState} → ${articulation} (note: ${note})`);
+            console.log(`[Synthesizer] 🔍 handleArticulation #${this._articulationCallCount}: ${prevState} → ${articulation} (note: ${note}, vol: ${volumeLinear?.toFixed(2)})`);
             this._articulationCallCount++;
+        }
+
+        // Phase 2.8 修复: 如果一直是 silence 但有足够音量，强制触发 attack
+        if (articulation === 'silence' && prevState === 'silence' && volumeLinear && volumeLinear > 0.15) {
+            if (!this._silenceFrameCount) this._silenceFrameCount = 0;
+            this._silenceFrameCount++;
+
+            // 连续 3 帧都是 silence 且音量足够，强制触发 attack
+            if (this._silenceFrameCount >= 3 && !this.isPlaying) {
+                console.log(`[Synthesizer] ⚠️ 强制触发 attack (OnsetDetector 未检测到，但音量足够: ${volumeLinear.toFixed(2)})`);
+                articulation = 'attack';  // 覆盖状态
+                this._silenceFrameCount = 0;
+            }
+        } else {
+            this._silenceFrameCount = 0;
         }
 
         // 状态转换: silence/release → attack

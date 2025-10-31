@@ -250,6 +250,19 @@ class SynthesizerEngine {
             volumeDb         // Phase 2.8: dB 音量
         } = pitchFrame;
 
+        // 临时调试日志 (首次调用时打印一次)
+        if (!this._debugLogged) {
+            console.log('[Synthesizer] 🔍 processPitchFrame() 首次调用:', {
+                frequency: frequency?.toFixed(1),
+                note: `${note}${octave}`,
+                confidence: confidence?.toFixed(2),
+                articulation,
+                volumeLinear: volumeLinear?.toFixed(2),
+                volumeDb: volumeDb?.toFixed(1)
+            });
+            this._debugLogged = true;
+        }
+
         // 检查置信度阈值
         const isValidPitch = confidence >= this.minConfidence &&
                             frequency && frequency >= 20 && frequency <= 2000;
@@ -374,6 +387,13 @@ class SynthesizerEngine {
      */
     handleArticulation(articulation, note, volumeLinear) {
         const prevState = this.lastArticulationState;
+
+        // 临时调试: 打印前5次状态变化
+        if (!this._articulationCallCount) this._articulationCallCount = 0;
+        if (this._articulationCallCount < 5) {
+            console.log(`[Synthesizer] 🔍 handleArticulation #${this._articulationCallCount}: ${prevState} → ${articulation} (note: ${note})`);
+            this._articulationCallCount++;
+        }
 
         // 状态转换: silence/release → attack
         if (articulation === 'attack' && (prevState === 'silence' || prevState === 'release')) {

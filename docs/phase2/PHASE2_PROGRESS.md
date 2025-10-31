@@ -456,9 +456,68 @@ release → silence (静音 > 100ms)
 
 ---
 
-### Phase 2.9-2.10: AudioWorklet + 测试完善 - 待开始
+### Phase 2.9: AudioWorklet 路径恢复 - 规划完成
+
+**状态**: 📋 规划完成，待实施
+**规划文档**: [PHASE2.9_PLAN.md](PHASE2.9_PLAN.md)
+**预计工作量**: ~430 行代码，5 小时
+**目标**: 恢复 AudioWorklet 模式，实现 8-15ms 低延迟
+
+**核心任务**:
+1. ✅ **问题分析**: ExpressiveFeatures 与 Worklet 线程隔离
+   - AnalyserNode 在主线程，Worklet 无法访问
+   - Buffer 大小不一致 (128 vs 2048 samples)
+   - postMessage 通信开销
+
+2. ⏳ **解决方案**: Worklet 端完整实现 (方案 C - 渐进式迁移)
+   - Task 1: 简化 FFT 实现 (~150 行)
+   - Task 2: 移植平滑滤波器 (~50 行)
+   - Task 3: 移植 OnsetDetector (~80 行)
+   - Task 4: AudioIO 消息处理 (~20 行修改)
+   - Task 5: 启用 useWorklet: true (~1 行修改)
+   - Task 6: 浏览器验证
+
+3. 📊 **预期成果**:
+   - 理论延迟: 46.44ms → 2.90ms (**-94%**)
+   - 实际延迟: 78.79ms → 8-15ms (**-81%**)
+   - Buffer Size: 2048 → 128 samples
+   - CPU: 主线程阻塞 → Worklet 线程隔离
+
+**技术方案**:
+```
+Microphone
+  ↓
+AudioWorkletNode.process() (Worklet 线程)
+  ├─ 累积 128 → 2048 samples
+  ├─ YIN 音高检测 (已实现)
+  ├─ 简化 FFT (新增)
+  ├─ 平滑滤波 (移植)
+  ├─ OnsetDetector (移植)
+  └─ 生成 PitchFrame
+  ↓
+postMessage → 主线程
+  ↓
+ContinuousSynth.processPitchFrame()
+```
+
+**风险与对策**:
+- ⚠️ FFT 性能: 使用简化实现 + WASM 优化备选
+- ⚠️ Safari 兼容性: 自动回退 256 buffer (已实现)
+- ⚠️ OnsetDetector 精度: 保留 Phase 2.4 测试验证
+
+**文档交付**:
+- ✅ PHASE2.9_PLAN.md (规划文档)
+- ⏳ PHASE2.9_VERIFICATION.md (验证指南)
+- ⏳ PHASE2.9_IMPLEMENTATION_LOG.md (实施日志)
+
+**下一步**: 开始 Task 1 - 简化 FFT 实现
+
+---
+
+### Phase 2.10: 测试与文档完善 - 待开始
 
 **状态**: ⏳ 待开始
+**前置条件**: Phase 2.9 完成
 
 ---
 
@@ -475,10 +534,10 @@ Phase 2.5补丁 ███████████████████ 100%  
 Phase 2.6  ████████████████████ 100%  ✅
 Phase 2.7  ████████████████████ 100%  ✅ (2025-01-31 浏览器验证通过)
 Phase 2.8  ██████████████░░░░░░  70%  ⚠️ (代码完成，兼容性问题未解决)
-Phase 2.9  ░░░░░░░░░░░░░░░░░░░░   0%  ⏳
+Phase 2.9  ████░░░░░░░░░░░░░░░░  20%  📋 (规划完成，待实施)
 Phase 2.10 ░░░░░░░░░░░░░░░░░░░░   0%  ⏳
 
-总体进度: 81% (8 完成 + 1 部分完成，共 10 阶段)
+总体进度: 83% (8 完成 + 1 部分完成 + 1 规划完成，共 10 阶段)
 ```
 
 ### 已完成模块汇总
@@ -518,25 +577,31 @@ Phase 2.10 ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## 🎯 下一步行动
 
-1. **立即任务**: Phase 2.7 浏览器验证
-   - 打开 http://localhost:50656
-   - 按照 PHASE2.7_VERIFICATION.md 进行 6 个测试场景
-   - 记录实际表现 (日志截图、音色描述)
-   - 如有问题，调整参数并重新测试
+1. **立即任务**: Phase 2.9 AudioWorklet 路径恢复
+   - 📋 规划文档已完成: [PHASE2.9_PLAN.md](PHASE2.9_PLAN.md)
+   - ⏳ Task 1: 在 pitch-worklet.js 实现简化 FFT (~150 行)
+   - ⏳ Task 2: 移植平滑滤波器 (EMA/Kalman) (~50 行)
+   - ⏳ Task 3: 移植 OnsetDetector 简化版 (~80 行)
+   - ⏳ Task 4-5: 修改 audio-io.js 消息处理 + 启用 useWorklet
+   - ⏳ Task 6: 浏览器验证 (延迟 < 20ms, 特征准确性)
 
-2. **短期目标**: Phase 2.8 Legacy Synthesizer 适配
-   - 文件: js/synthesizer.js
-   - 映射: volumeDb → velocity, brightness → filter, cents → detune, articulation → note on/off
+2. **短期目标**: Phase 2.9 验证通过
+   - 实际延迟达到 8-15ms (Chrome) 或 12-20ms (Safari)
+   - Phase 2.7 的 6 个测试场景全部通过
+   - 无音频断裂或丢帧 (2 分钟持续测试)
+   - 创建 PHASE2.9_VERIFICATION_RESULT.md
 
-3. **中期目标**: Phase 2.9 Worklet 路径恢复
-   - 研究 buffer 传递方案 (postMessage vs SharedArrayBuffer)
-   - 启用 useWorklet: true
-   - 恢复 8-15ms 低延迟
-
-4. **长期目标**: Phase 2.10 测试基础设施
+3. **中期目标**: Phase 2.10 测试基础设施完善
+   - 为 ContinuousSynth/Synthesizer 添加单元测试
+   - 创建端到端集成测试
    - 添加 npm test 脚本
    - 创建 run-all-tests.js
    - CI/CD 准备
+
+4. **长期目标**: Phase 2 收尾与 Phase 3 规划
+   - Phase 2.8 Legacy 模式深度优化 (可选)
+   - Phase 2 总结文档
+   - Phase 3 规划 (UI/UX 改进，或新特性)
 
 ---
 
@@ -568,6 +633,6 @@ Phase 2.10 ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ---
 
-**最后更新**: 2025-10-31
+**最后更新**: 2025-11-01
 **当前分支**: working-1
-**最新提交**: Phase 2.7 完成 (commit 4e2e83c)
+**最新提交**: Phase 2.8 完成文档 + Phase 2.9 规划 (commit 3ceae6b)

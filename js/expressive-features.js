@@ -3,8 +3,7 @@
  *
  * 统一入口，协调所有子模块（平滑、起音、频谱）来生成完整的 PitchFrame。
  *
- * Phase 2.6 占位实现：当前使用假数据，为主循环数据通路搭建骨架。
- * 后续阶段将集成真实的 SmoothingFilters / OnsetDetector / SpectralFeatures。
+ * Phase 2.6: 完整集成 SmoothingFilters、OnsetDetector、SpectralFeatures
  *
  * @module expressive-features
  */
@@ -12,6 +11,8 @@
 import { createPitchFrameFromBasic } from './types/pitch-frame.js';
 import * as AudioUtils from './utils/audio-utils.js';
 import { SpectralFeatures } from './features/spectral-features.js';
+import { KalmanFilter, EMAFilter } from './features/smoothing-filters.js';
+import { OnsetDetector } from './features/onset-detector.js';
 
 /**
  * ExpressiveFeatures 主类
@@ -34,9 +35,34 @@ export class ExpressiveFeatures {
     this.bufferSize = config.bufferSize || 2048;
     this.mode = config.mode || 'script-processor';
 
-    // Phase 2.6 TODO: 初始化子模块
-    // this.smoothingFilters = new SmoothingFilters(...);
-    // this.onsetDetector = new OnsetDetector(...);
+    // Phase 2.6: 初始化平滑滤波器
+    this.smoothingFilters = {
+      // Kalman Filter 用于 cents 平滑 (高精度音高)
+      cents: new KalmanFilter({
+        processNoise: 0.001,      // Q: 过程噪声 (越小越平滑)
+        measurementNoise: 0.1,    // R: 测量噪声 (越大越平滑)
+        initialEstimate: 0,       // 初始估计值
+        initialError: 1           // 初始误差
+      }),
+      // EMA Filter 用于音量平滑
+      volumeDb: new EMAFilter({
+        alpha: 0.3                // 平滑系数 (越小越平滑)
+      }),
+      // EMA Filter 用于亮度平滑
+      brightness: new EMAFilter({
+        alpha: 0.2                // 平滑系数
+      })
+    };
+
+    // Phase 2.6: 初始化起音检测器
+    this.onsetDetector = new OnsetDetector({
+      sampleRate: this.sampleRate,
+      energyThreshold: 6,         // dB 阈值 (音量增加超过 6dB 认为是 attack)
+      silenceThreshold: -40,      // dB 阈值 (低于 -40dB 认为是静音)
+      attackHoldTime: 50,         // ms (attack 状态最少持续时间)
+      releaseHoldTime: 100,       // ms (release 到 silence 的延迟)
+      debug: false
+    });
 
     // Phase 2.5: 初始化 SpectralFeatures
     this.spectralFeatures = null;
@@ -56,18 +82,32 @@ export class ExpressiveFeatures {
       });
     }
 
+    // Phase 2.6: 音高稳定性计算 (滑动窗口)
+    this.centsHistory = [];
+    this.centsHistoryMaxLength = 10;  // 保存最近 10 帧的 cents 值
+
+    // Phase 2.6: attackTime 计算 (从 silence 到 peak 的时间)
+    this.lastArticulationState = 'silence';
+    this.attackStartTime = 0;
+    this.currentAttackTime = 0;
+
     // 性能监控
     this.stats = {
       processCount: 0,
       totalProcessTime: 0,
-      avgProcessTime: 0
+      avgProcessTime: 0,
+      // Phase 2.6: 子模块性能统计
+      smoothingTime: 0,
+      onsetTime: 0,
+      spectralTime: 0
     };
 
-    console.log('[ExpressiveFeatures] 初始化 (Phase 2.6 占位版本)');
+    console.log('[ExpressiveFeatures] 初始化 (Phase 2.6 完整版本)');
     console.log(`  模式: ${this.mode}`);
     console.log(`  采样率: ${this.sampleRate} Hz`);
     console.log(`  缓冲区: ${this.bufferSize} 样本`);
-    console.log(`  AudioContext: ${this.audioContext ? '✅ 可用 (支持 SpectralFeatures)' : '❌ 未提供'}`);
+    console.log(`  AudioContext: ${this.audioContext ? '✅ 可用 (支持 AnalyserNode FFT)' : '❌ 未提供'}`);
+    console.log('  子模块: ✅ SmoothingFilters, ✅ OnsetDetector, ✅ SpectralFeatures');
   }
 
   /**
@@ -102,25 +142,24 @@ export class ExpressiveFeatures {
     }
 
     // 3. 计算音分偏移 (使用 AudioUtils)
+    let rawCents = 0;
     if (pitchInfo.frequency > 0 && pitchInfo.confidence > 0.5) {
       // 获取最接近的音符频率作为目标
       const noteInfo = AudioUtils.frequencyToNote(pitchInfo.frequency);
-      frame.cents = AudioUtils.calculateCents(
+      rawCents = AudioUtils.calculateCents(
         pitchInfo.frequency,
         noteInfo.targetFrequency
       );
-    } else {
-      frame.cents = 0;
     }
 
-    // 4. Phase 2.6 TODO: 平滑处理
-    // frame.cents = this.smoothingFilters.kalman.update(frame.cents);
-    // frame.volumeDb = this.smoothingFilters.ema.update(frame.volumeDb);
+    // 4. Phase 2.6: 平滑处理 ✅
+    const smoothStart = performance.now();
+    frame.cents = this.smoothingFilters.cents.update(rawCents);
+    frame.volumeDb = this.smoothingFilters.volumeDb.update(frame.volumeDb);
+    this.stats.smoothingTime = performance.now() - smoothStart;
 
-    // 5. Phase 2.6 TODO: 起音检测
-    // frame.articulation = this.onsetDetector.update(frame.volumeDb, timestamp);
-
-    // 6. Phase 2.5: 频域特征提取 ✅
+    // 5. Phase 2.6: 频域特征提取 ✅
+    const spectralStart = performance.now();
     if (this.spectralFeatures) {
       try {
         const spectralData = this.spectralFeatures.analyze(audioBuffer);
@@ -128,6 +167,9 @@ export class ExpressiveFeatures {
         frame.brightness = spectralData.brightness;
         frame.formant = spectralData.formant;
         frame.breathiness = spectralData.breathiness;
+
+        // 平滑 brightness
+        frame.brightness = this.smoothingFilters.brightness.update(frame.brightness);
       } catch (error) {
         console.error('[ExpressiveFeatures] SpectralFeatures 失败:', error);
         // 降级: 使用默认值
@@ -143,17 +185,42 @@ export class ExpressiveFeatures {
       frame.formant = 1000;
       frame.breathiness = 0.2;
     }
+    this.stats.spectralTime = performance.now() - spectralStart;
 
-    // Phase 2.6 TODO: OnsetDetector
-    // frame.articulation = this.onsetDetector.update(frame.volumeDb, timestamp);
+    // 6. Phase 2.6: 起音检测 ✅
+    const onsetStart = performance.now();
+    const currentState = this.onsetDetector.update(frame.volumeDb, timestamp);
+    frame.articulation = currentState;
 
-    // 占位: 其他未实现特征
-    frame.pitchStability = 0.8; // TODO: 基于 cents 方差计算
-    frame.articulation = frame.volumeDb > -40 ? 'sustain' : 'silence';
-    frame.attackTime = 0;
+    // 计算 attackTime (从 silence/release 到当前帧的时间)
+    if (currentState === 'attack' && this.lastArticulationState !== 'attack') {
+      // 刚进入 attack 状态
+      this.attackStartTime = timestamp;
+      this.currentAttackTime = 0;
+    } else if (currentState === 'attack' || currentState === 'sustain') {
+      // 在 attack 或 sustain 状态中，持续计算时间
+      this.currentAttackTime = timestamp - this.attackStartTime;
+    }
 
-    // 7. 可选: 保存原始数据 (调试用)
-    // frame.rawAudioBuffer = audioBuffer;
+    frame.attackTime = this.currentAttackTime;
+    this.lastArticulationState = currentState;
+    this.stats.onsetTime = performance.now() - onsetStart;
+
+    // 7. Phase 2.6: 音高稳定性计算 ✅
+    this.centsHistory.push(rawCents);
+    if (this.centsHistory.length > this.centsHistoryMaxLength) {
+      this.centsHistory.shift();
+    }
+
+    if (this.centsHistory.length >= 3) {
+      const centsVariance = AudioUtils.calculateVariance(this.centsHistory);
+      // stability = 1 / (1 + variance)
+      // variance 越小，stability 越接近 1
+      frame.pitchStability = 1 / (1 + centsVariance);
+    } else {
+      // 样本不足，使用默认值
+      frame.pitchStability = 0.5;
+    }
 
     // 性能统计
     const processTime = performance.now() - startTime;
@@ -185,20 +252,35 @@ export class ExpressiveFeatures {
   reset() {
     console.log('[ExpressiveFeatures] 重置状态');
 
+    // Phase 2.6: 重置平滑滤波器
+    this.smoothingFilters.cents.reset();
+    this.smoothingFilters.volumeDb.reset();
+    this.smoothingFilters.brightness.reset();
+
+    // Phase 2.6: 重置起音检测器
+    this.onsetDetector.reset();
+
     // Phase 2.5: 重置 SpectralFeatures
     if (this.spectralFeatures) {
       this.spectralFeatures.reset();
     }
 
-    // Phase 2.6 TODO: 重置其他子模块
-    // this.smoothingFilters.reset();
-    // this.onsetDetector.reset();
+    // Phase 2.6: 重置音高稳定性历史
+    this.centsHistory = [];
+
+    // Phase 2.6: 重置 attackTime 相关状态
+    this.lastArticulationState = 'silence';
+    this.attackStartTime = 0;
+    this.currentAttackTime = 0;
 
     // 重置性能统计
     this.stats = {
       processCount: 0,
       totalProcessTime: 0,
-      avgProcessTime: 0
+      avgProcessTime: 0,
+      smoothingTime: 0,
+      onsetTime: 0,
+      spectralTime: 0
     };
   }
 
@@ -210,13 +292,16 @@ export class ExpressiveFeatures {
   getStats() {
     const stats = { ...this.stats };
 
+    // Phase 2.6: 添加起音检测器统计
+    stats.onsetDetector = this.onsetDetector.getStats();
+
     // Phase 2.5: 添加 SpectralFeatures 统计
     if (this.spectralFeatures) {
       stats.spectralFeatures = this.spectralFeatures.getStats();
     }
 
-    // Phase 2.6 TODO: 添加其他子模块统计
-    // stats.onsetDetector = this.onsetDetector.getStats();
+    // Phase 2.6: 添加音高稳定性统计
+    stats.centsHistoryLength = this.centsHistory.length;
 
     return stats;
   }

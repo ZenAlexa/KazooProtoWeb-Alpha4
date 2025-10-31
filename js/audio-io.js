@@ -29,7 +29,7 @@ class AudioIO {
             sampleRate: 44100,
             bufferSize: 2048,        // ScriptProcessor 模式
             workletBufferSize: 128,  // AudioWorklet 模式
-            useWorklet: false,       // Feature Flag (Phase 1.7 启用)
+            useWorklet: true,        // Phase 2.9: 启用 AudioWorklet 低延迟模式
             workletFallback: true,   // 自动回退到 ScriptProcessor
             latencyHint: 'interactive',
             debug: false             // 调试模式

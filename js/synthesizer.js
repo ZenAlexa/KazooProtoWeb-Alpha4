@@ -16,12 +16,20 @@ class SynthesizerEngine {
         this.vibrato = null;
         this.filter = null;
 
+        // Phase 2.8: 噪声层 (用于气声效果)
+        this.noiseSource = null;
+        this.noiseFilter = null;
+        this.noiseGain = null;
+
         // 表现力参数
         this.expressiveness = {
             vibrato: 0,
             brightness: 0.5,
             volume: 0
         };
+
+        // Phase 2.8: 起音状态追踪
+        this.lastArticulationState = 'silence';  // 'silence' | 'attack' | 'sustain' | 'release'
 
         // 音符触发阈值（降低到 0.01 以适应用户的麦克风）
         this.minConfidence = 0.01;
@@ -84,7 +92,21 @@ class SynthesizerEngine {
             rolloff: -24
         });
 
-        console.log('Effects chain created');
+        // Phase 2.8: 噪声层 (气声效果)
+        this.noiseSource = new Tone.Noise('white').start();
+        this.noiseGain = new Tone.Gain(0);  // 初始静音
+        this.noiseFilter = new Tone.Filter({
+            type: 'bandpass',
+            frequency: 1000,
+            Q: 2
+        });
+
+        // 噪声链路: noiseSource → noiseFilter → noiseGain → filter → reverb
+        this.noiseSource.connect(this.noiseFilter);
+        this.noiseFilter.connect(this.noiseGain);
+        this.noiseGain.connect(this.filter);
+
+        console.log('[Synthesizer] Effects chain created (Phase 2.8: with noise layer)');
     }
 
     /**
@@ -204,19 +226,51 @@ class SynthesizerEngine {
      * 处理音高信息并触发音符 - 优化快速响应
      */
     /**
-     * Phase 2: 处理完整的 PitchFrame (包含表现力特征)
+     * Phase 2.8: 处理完整的 PitchFrame (包含表现力特征)
      *
      * @param {PitchFrame} pitchFrame - 完整的音高和表现力数据
      */
     processPitchFrame(pitchFrame) {
-        // Phase 2.8 TODO: 使用 PitchFrame 的表现力特征
-        // - pitchFrame.articulation → 智能音符触发 (attack/sustain/release)
-        // - pitchFrame.volumeDb → 动态 Velocity 控制
-        // - pitchFrame.brightness → Filter Cutoff
-        // - pitchFrame.cents → 微调音高偏移
+        if (!pitchFrame || !this.currentSynth) return;
 
-        // 当前: 回退到基础 processPitch (向后兼容)
-        this.processPitch(pitchFrame);
+        const {
+            frequency,
+            note,
+            octave,
+            confidence,
+            cents,           // Phase 2.8: 音分偏移
+            brightness,      // Phase 2.8: 音色亮度
+            breathiness,     // Phase 2.8: 气声度
+            articulation,    // Phase 2.8: 起音状态
+            volumeLinear,    // Phase 2.8: 线性音量
+            volumeDb         // Phase 2.8: dB 音量
+        } = pitchFrame;
+
+        // 检查置信度阈值
+        const isValidPitch = confidence >= this.minConfidence &&
+                            frequency && frequency >= 20 && frequency <= 2000;
+
+        if (!isValidPitch) {
+            // 无效音高，触发 release
+            this.handleArticulation('silence', null, 0);
+            return;
+        }
+
+        const fullNote = `${note}${octave}`;
+
+        // Phase 2.8: 智能起音处理
+        this.handleArticulation(articulation, fullNote, volumeLinear);
+
+        // Phase 2.8: 音分精细控制 (仅在播放时)
+        if (this.isPlaying) {
+            this.updateDetune(cents);
+        }
+
+        // Phase 2.8: 音色亮度控制
+        this.updateBrightness(brightness);
+
+        // Phase 2.8: 气声度控制
+        this.updateBreathiness(breathiness, frequency);
     }
 
     processPitch(pitchInfo) {
@@ -308,7 +362,116 @@ class SynthesizerEngine {
     }
 
     /**
-     * 更新表现力参数
+     * Phase 2.8: 智能起音处理 (基于 articulation 状态)
+     *
+     * @param {string} articulation - 'silence' | 'attack' | 'sustain' | 'release'
+     * @param {string} note - 音符名称 (如 'C4')
+     * @param {number} volumeLinear - 线性音量 (0-1)
+     */
+    handleArticulation(articulation, note, volumeLinear) {
+        const prevState = this.lastArticulationState;
+
+        // 状态转换: silence/release → attack
+        if (articulation === 'attack' && (prevState === 'silence' || prevState === 'release')) {
+            const velocity = Math.min(Math.max(volumeLinear * 2, 0.1), 1);
+
+            // 停止旧音符
+            if (this.isPlaying) {
+                try {
+                    this.currentSynth.triggerRelease(Tone.now());
+                } catch (e) {}
+            }
+
+            // 触发新音符
+            this.playNote(note, null, velocity);
+            console.log(`[Synthesizer] 🎺 Attack: ${note} (velocity: ${velocity.toFixed(2)})`);
+        }
+        // 状态转换: attack/sustain → release/silence
+        else if ((articulation === 'release' || articulation === 'silence') &&
+                 (prevState === 'attack' || prevState === 'sustain')) {
+            this.stopNote();
+            console.log(`[Synthesizer] 🔇 Release`);
+        }
+        // sustain 状态: 持续播放，可能切换音符
+        else if (articulation === 'sustain' && this.isPlaying) {
+            if (note && note !== this.currentNote) {
+                // 连音切换音符
+                const velocity = Math.min(Math.max(volumeLinear * 2, 0.1), 1);
+                this.playNote(note, null, velocity);
+                console.log(`[Synthesizer] 🎵 Note change (legato): ${note}`);
+            }
+        }
+
+        this.lastArticulationState = articulation;
+    }
+
+    /**
+     * Phase 2.8: 音分精细控制 (detune)
+     *
+     * @param {number} cents - 音分偏移 (-100 ~ +100)
+     */
+    updateDetune(cents) {
+        if (cents === undefined || cents === null) return;
+        if (!this.currentSynth || !this.currentSynth.detune) return;
+
+        // Tone.js 的 detune 单位就是 cents
+        this.currentSynth.detune.rampTo(cents, 0.02);
+
+        // 仅在显著偏移时打印日志
+        if (Math.abs(cents) > 15) {
+            console.log(`[Synthesizer] 🎵 Detune: ${cents.toFixed(1)} cents`);
+        }
+    }
+
+    /**
+     * Phase 2.8: 音色亮度控制 (Filter Cutoff)
+     *
+     * @param {number} brightness - 亮度 (0-1)
+     */
+    updateBrightness(brightness) {
+        if (brightness === undefined || brightness === null) return;
+
+        // 非线性映射: brightness^1.5 * 7800 + 200
+        const mappedBrightness = Math.pow(brightness, 1.5);
+        const filterFreq = 200 + mappedBrightness * 7800;
+        this.filter.frequency.rampTo(filterFreq, 0.02);
+
+        // 仅在极端值时打印日志
+        if (brightness < 0.3 || brightness > 0.7) {
+            console.log(`[Synthesizer] 🌟 Brightness: ${brightness.toFixed(2)} → Filter: ${filterFreq.toFixed(0)} Hz`);
+        }
+
+        this.expressiveness.brightness = brightness;
+    }
+
+    /**
+     * Phase 2.8: 气声度控制 (Noise Layer)
+     *
+     * @param {number} breathiness - 气声度 (0-1)
+     * @param {number} frequency - 当前频率 (用于调整噪声滤波器)
+     */
+    updateBreathiness(breathiness, frequency) {
+        if (breathiness === undefined || breathiness === null) return;
+        if (!this.noiseGain) return;
+
+        // 气声度映射: 0-1 → 0%-30% 噪声增益
+        const noiseLevel = breathiness * 0.3;
+        this.noiseGain.gain.rampTo(noiseLevel, 0.05);
+
+        // 根据音高调整噪声滤波器中心频率
+        if (frequency && this.noiseFilter) {
+            const noiseFreq = frequency * 2;  // 倍频噪声
+            this.noiseFilter.frequency.rampTo(noiseFreq, 0.05);
+        }
+
+        // 仅在显著气声时打印日志
+        if (breathiness > 0.3) {
+            console.log(`[Synthesizer] 💨 Breathiness: ${breathiness.toFixed(2)} (noise: ${(noiseLevel * 100).toFixed(0)}%)`);
+        }
+    }
+
+    /**
+     * 更新表现力参数 (Phase 1 兼容接口)
      */
     updateExpressiveness(pitchInfo) {
         const { cents, volume } = pitchInfo;
@@ -398,6 +561,19 @@ class SynthesizerEngine {
 
         if (this.filter) {
             this.filter.dispose();
+        }
+
+        // Phase 2.8: 清理噪声层
+        if (this.noiseSource) {
+            this.noiseSource.dispose();
+        }
+
+        if (this.noiseGain) {
+            this.noiseGain.dispose();
+        }
+
+        if (this.noiseFilter) {
+            this.noiseFilter.dispose();
         }
     }
 }

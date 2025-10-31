@@ -11,6 +11,7 @@
 
 import { createPitchFrameFromBasic } from './types/pitch-frame.js';
 import * as AudioUtils from './utils/audio-utils.js';
+import { SpectralFeatures } from './features/spectral-features.js';
 
 /**
  * ExpressiveFeatures 主类
@@ -37,13 +38,23 @@ export class ExpressiveFeatures {
     // this.smoothingFilters = new SmoothingFilters(...);
     // this.onsetDetector = new OnsetDetector(...);
 
-    // Phase 2.5: 预留 SpectralFeatures 初始化
-    // if (this.audioContext) {
-    //   this.spectralFeatures = new SpectralFeatures({
-    //     audioContext: this.audioContext,
-    //     fftSize: 2048
-    //   });
-    // }
+    // Phase 2.5: 初始化 SpectralFeatures
+    this.spectralFeatures = null;
+    if (this.audioContext) {
+      this.spectralFeatures = new SpectralFeatures({
+        audioContext: this.audioContext,
+        fftSize: 2048,
+        sampleRate: this.sampleRate,
+        fftInterval: 2  // 每 2 帧运行一次 FFT (性能优化)
+      });
+    } else {
+      // 降级到纯 JS FFT (Node.js 测试或无 audioContext)
+      this.spectralFeatures = new SpectralFeatures({
+        fftSize: 2048,
+        sampleRate: this.sampleRate,
+        fftInterval: 2
+      });
+    }
 
     // 性能监控
     this.stats = {
@@ -109,21 +120,37 @@ export class ExpressiveFeatures {
     // 5. Phase 2.6 TODO: 起音检测
     // frame.articulation = this.onsetDetector.update(frame.volumeDb, timestamp);
 
-    // 6. Phase 2.6 TODO: 频域特征提取
-    // const spectralData = this.spectralFeatures.analyze(audioBuffer);
-    // frame.spectralCentroid = spectralData.centroid;
-    // frame.brightness = spectralData.brightness;
-    // frame.formant = spectralData.formant;
-    // frame.breathiness = spectralData.breathiness;
+    // 6. Phase 2.5: 频域特征提取 ✅
+    if (this.spectralFeatures) {
+      try {
+        const spectralData = this.spectralFeatures.analyze(audioBuffer);
+        frame.spectralCentroid = spectralData.spectralCentroid;
+        frame.brightness = spectralData.brightness;
+        frame.formant = spectralData.formant;
+        frame.breathiness = spectralData.breathiness;
+      } catch (error) {
+        console.error('[ExpressiveFeatures] SpectralFeatures 失败:', error);
+        // 降级: 使用默认值
+        frame.spectralCentroid = 1500;
+        frame.brightness = 0.5;
+        frame.formant = 1000;
+        frame.breathiness = 0.2;
+      }
+    } else {
+      // 无 SpectralFeatures: 使用默认值
+      frame.spectralCentroid = 1500;
+      frame.brightness = 0.5;
+      frame.formant = 1000;
+      frame.breathiness = 0.2;
+    }
 
-    // 占位: 使用假数据
+    // Phase 2.6 TODO: OnsetDetector
+    // frame.articulation = this.onsetDetector.update(frame.volumeDb, timestamp);
+
+    // 占位: 其他未实现特征
     frame.pitchStability = 0.8; // TODO: 基于 cents 方差计算
     frame.articulation = frame.volumeDb > -40 ? 'sustain' : 'silence';
     frame.attackTime = 0;
-    frame.spectralCentroid = 1500;
-    frame.brightness = 0.5;
-    frame.formant = 1000;
-    frame.breathiness = 0.2;
 
     // 7. 可选: 保存原始数据 (调试用)
     // frame.rawAudioBuffer = audioBuffer;
@@ -143,10 +170,14 @@ export class ExpressiveFeatures {
   reset() {
     console.log('[ExpressiveFeatures] 重置状态');
 
-    // Phase 2.6 TODO: 重置所有子模块
+    // Phase 2.5: 重置 SpectralFeatures
+    if (this.spectralFeatures) {
+      this.spectralFeatures.reset();
+    }
+
+    // Phase 2.6 TODO: 重置其他子模块
     // this.smoothingFilters.reset();
     // this.onsetDetector.reset();
-    // this.spectralFeatures.reset();
 
     // 重置性能统计
     this.stats = {
@@ -162,7 +193,17 @@ export class ExpressiveFeatures {
    * @returns {Object} 性能统计数据
    */
   getStats() {
-    return { ...this.stats };
+    const stats = { ...this.stats };
+
+    // Phase 2.5: 添加 SpectralFeatures 统计
+    if (this.spectralFeatures) {
+      stats.spectralFeatures = this.spectralFeatures.getStats();
+    }
+
+    // Phase 2.6 TODO: 添加其他子模块统计
+    // stats.onsetDetector = this.onsetDetector.getStats();
+
+    return stats;
   }
 }
 

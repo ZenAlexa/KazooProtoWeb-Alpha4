@@ -15,7 +15,7 @@ class KazooApp {
         this.audioIO = null;     // AudioIO 实例
 
         // Phase 2: 双引擎模式
-        this.useContinuousMode = false;  // Phase 2.8: 切换到 Legacy 模式测试
+        this.useContinuousMode = true;  // Phase 2: 默认使用 Continuous 模式 (Phase 2.7 已验证)
         this.currentEngine = null;      // 当前激活的引擎
 
         // Phase 2: 表现力特征提取

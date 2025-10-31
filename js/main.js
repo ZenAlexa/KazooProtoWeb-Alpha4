@@ -298,11 +298,11 @@ class KazooApp {
         }
 
         // Phase 2: 初始化 ExpressiveFeatures (使用实际参数)
-        if (!this.expressiveFeatures && audioContext) {
+        if (!this.expressiveFeatures && audioContext && window.ExpressiveFeatures) {
             console.log('🎨 [Phase 2] Initializing ExpressiveFeatures...');
             console.log(`  Mode: ${mode}, Buffer: ${bufferSize}, SampleRate: ${audioContext.sampleRate}`);
-            const { ExpressiveFeatures } = await import('./expressive-features.js');
-            this.expressiveFeatures = new ExpressiveFeatures({
+
+            this.expressiveFeatures = new window.ExpressiveFeatures({
                 audioContext: audioContext,  // 传入 audioContext (Phase 2.5 需要)
                 sampleRate: audioContext.sampleRate,
                 bufferSize: bufferSize,
@@ -318,6 +318,8 @@ class KazooApp {
                     console.warn('⚠️ [Phase 2.5] AnalyserNode FFT 启用失败，继续使用纯 JS FFT');
                 }
             }
+        } else if (!window.ExpressiveFeatures) {
+            console.warn('⚠️ [Phase 2] ExpressiveFeatures 模块未加载，跳过初始化');
         }
     }
 

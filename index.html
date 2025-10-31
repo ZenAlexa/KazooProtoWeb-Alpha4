@@ -229,6 +229,14 @@
     <script src="js/synthesizer.js"></script>
     <script src="js/continuous-synth.js"></script> <!-- Phase 2: New engine -->
     <script src="js/performance.js"></script>
+
+    <!-- Phase 2: 表现力特征提取模块 (必须在 main.js 之前加载) -->
+    <script type="module">
+        // 动态加载 ExpressiveFeatures 并暴露到全局
+        import { ExpressiveFeatures } from './js/expressive-features.js';
+        window.ExpressiveFeatures = ExpressiveFeatures;
+    </script>
+
     <script src="js/main.js"></script>
     <!-- 注意：不再加载 calibration.js -->
 </body>

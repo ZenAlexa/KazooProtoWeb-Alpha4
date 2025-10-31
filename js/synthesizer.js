@@ -31,6 +31,10 @@ class SynthesizerEngine {
         // Phase 2.8: 起音状态追踪
         this.lastArticulationState = 'silence';  // 'silence' | 'attack' | 'sustain' | 'release'
 
+        // Phase 2.8: 上一次的特征值 (用于减少日志刷屏)
+        this.lastLoggedBrightness = -1;
+        this.lastLoggedBreathiness = -1;
+
         // 音符触发阈值（降低到 0.01 以适应用户的麦克风）
         this.minConfidence = 0.01;
     }
@@ -436,9 +440,13 @@ class SynthesizerEngine {
         const filterFreq = 200 + mappedBrightness * 7800;
         this.filter.frequency.rampTo(filterFreq, 0.02);
 
-        // 仅在极端值时打印日志
-        if (brightness < 0.3 || brightness > 0.7) {
+        // 仅在显著变化时打印日志 (变化 > 0.1 或极端值)
+        const brightnessChanged = Math.abs(brightness - this.lastLoggedBrightness) > 0.1;
+        const isExtreme = brightness < 0.2 || brightness > 0.8;
+
+        if (brightnessChanged || (isExtreme && Math.abs(brightness - this.lastLoggedBrightness) > 0.02)) {
             console.log(`[Synthesizer] 🌟 Brightness: ${brightness.toFixed(2)} → Filter: ${filterFreq.toFixed(0)} Hz`);
+            this.lastLoggedBrightness = brightness;
         }
 
         this.expressiveness.brightness = brightness;
@@ -464,9 +472,11 @@ class SynthesizerEngine {
             this.noiseFilter.frequency.rampTo(noiseFreq, 0.05);
         }
 
-        // 仅在显著气声时打印日志
-        if (breathiness > 0.3) {
+        // 仅在显著变化时打印日志
+        const breathinessChanged = Math.abs(breathiness - this.lastLoggedBreathiness) > 0.15;
+        if (breathiness > 0.3 && breathinessChanged) {
             console.log(`[Synthesizer] 💨 Breathiness: ${breathiness.toFixed(2)} (noise: ${(noiseLevel * 100).toFixed(0)}%)`);
+            this.lastLoggedBreathiness = breathiness;
         }
     }
 

@@ -330,7 +330,7 @@ release → silence (静音 > 100ms)
 **测试覆盖**:
 1. 构造和初始化 (1 项)
 2. 完整 PitchFrame 生成 (1 项)
-3. 平滑效果验证 (1 项) - Kalman 滤波方差降低 79.4%
+3. 平滑效果验证 (1 项) - Kalman 滤波方差降低 96% (9.374 → 0.369)
 4. 起音检测状态转换 (1 项) - silence → attack → sustain
 5. 音高稳定性计算 (1 项) - 稳定音高 vs 颤音
 6. 频域特征提取 (1 项) - 正弦波 vs 白噪声
@@ -350,8 +350,13 @@ release → silence (静音 > 100ms)
 - 稳定音高稳定性: ✅ 0.933 vs 颤音 0.105
 - 频域特征 (纯 JS FFT):
   - 白噪声气声度: ✅ ≈0.85 vs 正弦波 ≈0.20
-  - 频谱质心: 纯 JS 模式使用默认值 (AnalyserNode 模式待浏览器验证)
+  - 频谱质心: 纯 JS 模式使用默认值 1500Hz (AnalyserNode 模式待浏览器验证实际频率)
 - 起音检测: ✅ silence → attack → sustain 转换正常
+
+**重要说明**:
+- 上述测试在 Node.js 环境运行，使用纯 JS FFT
+- 频谱质心在纯 JS 模式下返回默认值，不代表真实频率
+- 真实频谱分析需在浏览器中启用 AnalyserNode 路径
 
 **性能表现** (Node.js 测试环境):
 - 平均处理时间: <0.1 ms/帧 (小数据量)
@@ -363,13 +368,14 @@ release → silence (静音 > 100ms)
 - ⏳ 待浏览器实际运行确认日志: "✅ [Phase 2.5] AnalyserNode FFT 已启用"
 - ⏳ 待浏览器实际测试频谱质心准确性 (440Hz 正弦波应接近 440Hz)
 
-**Phase 2.6 已知限制** (Phase 2.7 待完成):
-- ⚠️ **ContinuousSynth/Synthesizer 适配**: 当前仍使用 processPitch() 回退
-  - 需要映射: cents → pitch bend
-  - 需要映射: brightness → filter cutoff
-  - 需要映射: breathiness → noise layer
-  - 需要映射: articulation → envelope trigger
-- ⚠️ **Worklet 路径**: 默认禁用，Phase 2.7/2.8 再迁移完整 ExpressiveFeatures 到 Worklet
+**Phase 2.6 已知限制** (Phase 2.7 已解决大部分):
+- ~~⚠️ **ContinuousSynth 适配**~~ → ✅ Phase 2.7 已完成
+  - ✅ 已映射: cents → pitch bend
+  - ✅ 已映射: brightness → filter cutoff
+  - ✅ 已映射: breathiness → noise layer
+  - ✅ 已映射: articulation → envelope trigger
+- ⚠️ **Legacy Synthesizer 适配**: js/synthesizer.js 仍未使用表现力特征 (Phase 2.8)
+- ⚠️ **Worklet 路径**: 默认禁用 (useWorklet: false)，Phase 2.9 恢复
 
 **交付物评估**: ✅ 完整且通过全部测试 (Node.js 环境)
 
@@ -379,32 +385,35 @@ release → silence (静音 > 100ms)
 
 ---
 
-### Phase 2.7: ContinuousSynth 表现力特征适配 - 完成
+### Phase 2.7: ContinuousSynth 表现力特征适配 - 代码实现完成
 
 **实现文件**: `js/continuous-synth.js`
 - **新增代码**: 约 150 行 (含注释和日志)
 - **内容**: 完整的表现力特征消费逻辑
-  - ✅ Pitch Bend: cents → 精细音高微调
+  - ✅ Pitch Bend: cents → 精细音高微调 (使用 Math.pow(2, cents/1200))
   - ✅ Filter Cutoff: brightness → 音色亮度控制 (200-8000Hz, 非线性映射)
   - ✅ Noise Layer: breathiness → 气声效果 (最大 30% 噪声)
   - ✅ ADSR Trigger: articulation → 起音/释放自动触发
 
-**技术亮点**:
-- 新增噪声层: Tone.Noise + BandPass Filter + Gain
+**技术实现**:
+- 新增噪声层: Tone.Noise('white') + BandPass Filter (frequency * 2) + Gain
 - 状态追踪: lastArticulationState (检测 attack/release 转换)
 - 调试日志: 🎵 Pitch bend / 🌟 Brightness / 💨 Breathiness / 🔇 Release
 - 向后兼容: 保留 processPitch() 和 updateExpressiveness() 回退逻辑
 
 **验证文档**: `PHASE2.7_VERIFICATION.md`
-- 4 个核心映射的实现逻辑
-- 6 个测试场景 (稳定音/颤音/明亮/低沉/气声/断音)
-- 完整的浏览器验证步骤
+- 4 个核心映射的实现逻辑和代码位置
+- 6 个测试场景详细步骤 (稳定音/颤音/明亮/低沉/气声/断音)
+- 预期日志和音色效果说明
 
-**浏览器测试**: ⏳ 待用户验证
-- 验证方法: 打开 http://localhost:50656，按照 PHASE2.7_VERIFICATION.md 测试
-- 预期: 音色随表现力特征明显变化
+**当前状态**: ⚠️ 代码实现完成，但缺少验证
+- ❌ 无自动化测试覆盖 (ContinuousSynth 新逻辑未测试)
+- ❌ 未在浏览器中实际运行验证
+- ❌ 无日志截图或音色效果记录
+- ⏳ 需要按照 PHASE2.7_VERIFICATION.md 进行 6 个场景的手动验证
 
-**交付物评估**: ✅ 实现完成，待浏览器验证
+**交付物评估**: ⚠️ 实现完成，但验证不充分
+- 建议: 先完成浏览器验证并记录结果，再继续 Phase 2.8
 
 ---
 
@@ -425,25 +434,25 @@ Phase 2.4补充 ███████████████████ 100%  
 Phase 2.5  ████████████████████ 100%  ✅
 Phase 2.5补丁 ███████████████████ 100%  ✅
 Phase 2.6  ████████████████████ 100%  ✅
-Phase 2.7  ████████████████████ 100%  ✅ (待浏览器验证)
+Phase 2.7  ████████████████░░░░  85%  ⚠️ (代码完成，验证不足)
 Phase 2.8  ░░░░░░░░░░░░░░░░░░░░   0%  ⏳
 Phase 2.9  ░░░░░░░░░░░░░░░░░░░░   0%  ⏳
 Phase 2.10 ░░░░░░░░░░░░░░░░░░░░   0%  ⏳
 
-总体进度: 78% (8/10 核心阶段完成，含 1 补丁)
+总体进度: 74% (7 完成 + 1 部分完成，共 10 阶段)
 ```
 
 ### 已完成模块汇总
 
 | 阶段 | 模块 | 代码行数 | 测试行数 | 断言数 | 状态 |
 |------|------|---------|---------|--------|------|
-| 2.3 | SmoothingFilters | 418 | 455 | 39 | ✅ |
-| 2.4 | OnsetDetector | 345 | 482 | 34 | ✅ |
-| 2.4补充 | AudioUtils | 317 | 436 | 67 | ✅ |
-| 2.5 | SpectralFeatures | 317 | 414 | 58 | ✅ |
-| 2.6 | ExpressiveFeatures | 311 | 472 | 52 | ✅ |
-| 2.7 | ContinuousSynth 适配 | ~150 | - | - | ✅ (待验证) |
-| **合计** | **6 个模块** | **~1858** | **2259** | **250** | ✅ |
+| 2.3 | SmoothingFilters | 418 | 455 | 39 | ✅ 测试通过 |
+| 2.4 | OnsetDetector | 345 | 482 | 34 | ✅ 测试通过 |
+| 2.4补充 | AudioUtils | 317 | 436 | 67 | ✅ 测试通过 |
+| 2.5 | SpectralFeatures | 317 | 414 | 58 | ✅ 测试通过 |
+| 2.6 | ExpressiveFeatures | 311 | 472 | 52 | ✅ 测试通过 |
+| 2.7 | ContinuousSynth 适配 | ~150 | 0 | 0 | ⚠️ 无测试 |
+| **合计** | **6 个模块** | **~1858** | **2259** | **250** | **5/6 已测试** |
 
 ---
 

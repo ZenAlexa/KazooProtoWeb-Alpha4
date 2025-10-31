@@ -22,17 +22,28 @@ export class ExpressiveFeatures {
    * 构造函数
    *
    * @param {Object} [config={}] - 配置对象
+   * @param {AudioContext} [config.audioContext] - Web Audio API 上下文 (Phase 2.5 需要)
    * @param {number} [config.sampleRate=44100] - 采样率
    * @param {number} [config.bufferSize=2048] - 缓冲区大小
+   * @param {string} [config.mode='script-processor'] - 音频模式
    */
   constructor(config = {}) {
+    this.audioContext = config.audioContext || null;
     this.sampleRate = config.sampleRate || 44100;
     this.bufferSize = config.bufferSize || 2048;
+    this.mode = config.mode || 'script-processor';
 
     // Phase 2.6 TODO: 初始化子模块
     // this.smoothingFilters = new SmoothingFilters(...);
     // this.onsetDetector = new OnsetDetector(...);
-    // this.spectralFeatures = new SpectralFeatures(...);
+
+    // Phase 2.5: 预留 SpectralFeatures 初始化
+    // if (this.audioContext) {
+    //   this.spectralFeatures = new SpectralFeatures({
+    //     audioContext: this.audioContext,
+    //     fftSize: 2048
+    //   });
+    // }
 
     // 性能监控
     this.stats = {
@@ -42,8 +53,10 @@ export class ExpressiveFeatures {
     };
 
     console.log('[ExpressiveFeatures] 初始化 (Phase 2.6 占位版本)');
+    console.log(`  模式: ${this.mode}`);
     console.log(`  采样率: ${this.sampleRate} Hz`);
     console.log(`  缓冲区: ${this.bufferSize} 样本`);
+    console.log(`  AudioContext: ${this.audioContext ? '✅ 可用 (支持 SpectralFeatures)' : '❌ 未提供'}`);
   }
 
   /**
@@ -79,9 +92,11 @@ export class ExpressiveFeatures {
 
     // 3. 计算音分偏移 (使用 AudioUtils)
     if (pitchInfo.frequency > 0 && pitchInfo.confidence > 0.5) {
+      // 获取最接近的音符频率作为目标
+      const noteInfo = AudioUtils.frequencyToNote(pitchInfo.frequency);
       frame.cents = AudioUtils.calculateCents(
         pitchInfo.frequency,
-        pitchInfo.frequency // TODO: Phase 2.6 应使用 targetFrequency
+        noteInfo.targetFrequency
       );
     } else {
       frame.cents = 0;

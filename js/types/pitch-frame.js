@@ -102,11 +102,27 @@ export function createPitchFrameFromBasic(pitchInfo, timestamp = 0) {
   frame.frequency = pitchInfo.frequency || 0;
   frame.confidence = pitchInfo.confidence || 0;
 
+  // 补齐 note/octave (避免 UI 显示 undefined)
   if (pitchInfo.note) {
     frame.note = pitchInfo.note;
+  } else if (pitchInfo.frequency > 0) {
+    // 使用 AudioUtils 从频率推算音符
+    // 避免循环依赖：在使用时动态 import
+    // 这里先用默认值，ExpressiveFeatures 会补齐
+    frame.note = 'C4';  // 临时默认值
   }
+
   if (pitchInfo.octave !== undefined) {
     frame.octave = pitchInfo.octave;
+  }
+
+  // 如果 pitchInfo 有额外字段 (如 volume, cents)，也复制过来
+  if (pitchInfo.volume !== undefined) {
+    frame.volumeLinear = pitchInfo.volume;
+    // volumeDb 由 ExpressiveFeatures 计算
+  }
+  if (pitchInfo.cents !== undefined) {
+    frame.cents = pitchInfo.cents;
   }
 
   return frame;

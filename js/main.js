@@ -190,10 +190,12 @@ class KazooApp {
             this.audioIO = new AudioIO();
 
             // 配置 AudioIO
+            // Phase 2 注意: 当前 ExpressiveFeatures 需要完整 audioBuffer
+            // Worklet 模式暂时禁用，Phase 2.7 再完整实现
             this.audioIO.configure({
-                useWorklet: true,           // Phase 1 完成: 启用 AudioWorklet!
+                useWorklet: false,          // Phase 2: 暂时禁用 (等待 Phase 2.7)
                 workletBufferSize: 128,     // 低延迟目标 (2.9ms @ 44.1kHz)
-                bufferSize: 2048,           // ScriptProcessor 回退
+                bufferSize: 2048,           // ScriptProcessor (Phase 2 默认)
                 workletFallback: true,      // 自动回退到 ScriptProcessor
                 sampleRate: 44100,
                 latencyHint: 'interactive',
@@ -216,17 +218,16 @@ class KazooApp {
             });
         }
 
-        // 2. 初始化引擎
-        await this._initializeEngines(this.audioIO.audioContext || null);
-
-        // 3. 启动音频系统
+        // 2. 启动音频系统 (先启动，获取实际 mode 和 bufferSize)
         const result = await this.audioIO.start();
         console.log('🎵 AudioIO 已启动:', result);
 
-        // 4. 更新性能监控
+        // 3. 初始化引擎 (使用实际的 audioContext 和 bufferSize)
         const ctx = this.audioIO.audioContext;
         const bufferSize = result.mode === 'worklet' ? 128 : 2048;
+        await this._initializeEngines(ctx, bufferSize, result.mode);
 
+        // 4. 更新性能监控
         if (!performanceMonitor.metrics.sampleRate) {
             await performanceMonitor.initialize(ctx, bufferSize, result.mode);
         }
@@ -243,11 +244,15 @@ class KazooApp {
             await audioInputManager.initialize();
         }
 
-        // 初始化引擎
-        await this._initializeEngines(audioInputManager.audioContext);
-
         // 启动麦克风
         await audioInputManager.startMicrophone();
+
+        // 初始化引擎 (使用 Legacy 的 bufferSize)
+        await this._initializeEngines(
+            audioInputManager.audioContext,
+            audioInputManager.config.bufferSize,
+            'script-processor'
+        );
 
         // 设置音频处理回调
         audioInputManager.onAudioProcess = this.onAudioProcess.bind(this);
@@ -265,8 +270,12 @@ class KazooApp {
     /**
      * 初始化合成器引擎和音高检测器
      * Phase 2: 添加 ExpressiveFeatures 初始化
+     *
+     * @param {AudioContext} audioContext - Web Audio API 上下文
+     * @param {number} bufferSize - 实际使用的缓冲区大小
+     * @param {string} mode - 音频模式 ('worklet' | 'script-processor')
      */
-    async _initializeEngines(audioContext) {
+    async _initializeEngines(audioContext, bufferSize = 2048, mode = 'script-processor') {
         // 选择引擎
         if (this.useContinuousMode) {
             this.currentEngine = continuousSynthEngine;
@@ -288,13 +297,16 @@ class KazooApp {
             pitchDetector.initialize(audioContext.sampleRate);
         }
 
-        // Phase 2: 初始化 ExpressiveFeatures
-        if (!this.expressiveFeatures) {
+        // Phase 2: 初始化 ExpressiveFeatures (使用实际参数)
+        if (!this.expressiveFeatures && audioContext) {
             console.log('🎨 [Phase 2] Initializing ExpressiveFeatures...');
+            console.log(`  Mode: ${mode}, Buffer: ${bufferSize}, SampleRate: ${audioContext.sampleRate}`);
             const { ExpressiveFeatures } = await import('./expressive-features.js');
             this.expressiveFeatures = new ExpressiveFeatures({
-                sampleRate: audioContext ? audioContext.sampleRate : 44100,
-                bufferSize: this.useAudioIO ? 128 : 2048
+                audioContext: audioContext,  // 传入 audioContext (Phase 2.5 需要)
+                sampleRate: audioContext.sampleRate,
+                bufferSize: bufferSize,
+                mode: mode
             });
         }
     }
@@ -346,12 +358,15 @@ class KazooApp {
         // 性能监控开始
         performanceMonitor.startProcessing();
 
-        // Phase 2: 生成 PitchFrame (暂时没有 audioBuffer，用空数组占位)
+        // Phase 2: 生成 PitchFrame
+        // ⚠️ 警告: AudioWorklet 模式下没有 audioBuffer，表现力特征不完整
         let pitchFrame = pitchInfo;  // 默认使用原始 pitchInfo
         if (this.expressiveFeatures) {
             try {
-                // TODO Phase 2.6: AudioWorklet 需要传递 audioBuffer
-                const dummyBuffer = new Float32Array(128);  // 临时占位
+                // TODO Phase 2.7: 在 Worklet 中传递 audioBuffer 或直接计算特征
+                const dummyBuffer = new Float32Array(128);  // 占位 (volumeDb 会是 -60)
+                console.warn('[Phase 2] AudioWorklet 模式下表现力特征不完整，请使用 ScriptProcessor');
+
                 pitchFrame = this.expressiveFeatures.process({
                     pitchInfo,
                     audioBuffer: dummyBuffer,

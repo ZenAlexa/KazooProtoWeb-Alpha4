@@ -202,14 +202,24 @@ class KazooApp {
                 debug: true                 // 启用调试日志
             });
 
-            // 注册音高检测回调 (Worklet 模式)
-            this.audioIO.onPitchDetected((pitchInfo) => {
-                this.onPitchDetected(pitchInfo);
+            // Phase 2.9: 注册回调 (根据模式区分)
+            // Worklet 模式: onFrame 接收完整 PitchFrame (11字段)
+            // ScriptProcessor 模式: onFrame 接收原始 audioBuffer
+            this.audioIO.onFrame((data, timestamp) => {
+                // 判断数据类型
+                if (data && typeof data === 'object' && 'frequency' in data) {
+                    // Worklet 模式: data 是 PitchFrame
+                    this.onPitchFrame(data, timestamp);
+                } else if (data instanceof Float32Array) {
+                    // ScriptProcessor 模式: data 是 audioBuffer
+                    this.onAudioProcess(data);
+                }
             });
 
-            // 注册音频帧回调 (ScriptProcessor 模式)
-            this.audioIO.onFrame((audioBuffer) => {
-                this.onAudioProcess(audioBuffer);
+            // 兼容回调 (Phase 1)
+            this.audioIO.onPitchDetected((pitchInfo) => {
+                // 已通过 onFrame 处理，这里可以忽略或用于调试
+                // console.log('[Debug] onPitchDetected:', pitchInfo);
             });
 
             // 错误处理
@@ -458,6 +468,41 @@ class KazooApp {
             // 可视化
             this.updateVisualizer(pitchFrame);
         }
+
+        // 性能监控结束
+        performanceMonitor.endProcessing();
+
+        // 更新性能指标
+        performanceMonitor.updateFPS();
+        const metrics = performanceMonitor.getMetrics();
+        this.ui.latency.textContent = `${metrics.totalLatency}ms`;
+    }
+
+    /**
+     * Phase 2.9: 处理 Worklet 模式的 PitchFrame
+     * Worklet 已经完成所有特征提取 (YIN + FFT + EMA + OnsetDetector)
+     */
+    onPitchFrame(pitchFrame, timestamp) {
+        if (!this.isRunning || !this.currentEngine) return;
+
+        // 性能监控开始
+        performanceMonitor.startProcessing();
+
+        // 更新显示
+        this.ui.currentNote.textContent = `${pitchFrame.note}${pitchFrame.octave}`;
+        this.ui.currentFreq.textContent = `${pitchFrame.frequency.toFixed(1)} Hz`;
+        this.ui.confidence.textContent = `${Math.round(pitchFrame.confidence * 100)}%`;
+
+        // 直接传递给合成器 (已包含所有特征)
+        if (this.currentEngine.processPitchFrame) {
+            this.currentEngine.processPitchFrame(pitchFrame);
+        } else if (this.currentEngine.processPitch) {
+            // 回退到基础 API (如果合成器不支持 PitchFrame)
+            this.currentEngine.processPitch(pitchFrame);
+        }
+
+        // 可视化
+        this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
         performanceMonitor.endProcessing();

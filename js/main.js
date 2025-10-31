@@ -485,6 +485,12 @@ class KazooApp {
     onPitchFrame(pitchFrame, timestamp) {
         if (!this.isRunning || !this.currentEngine) return;
 
+        // Phase 2.9 调试: 首次调用时打印完整 PitchFrame
+        if (!this._pitchFrameDebugLogged) {
+            console.log('[Main] 🎯 onPitchFrame 首次调用 (Worklet 模式):', pitchFrame);
+            this._pitchFrameDebugLogged = true;
+        }
+
         // 性能监控开始
         performanceMonitor.startProcessing();
 

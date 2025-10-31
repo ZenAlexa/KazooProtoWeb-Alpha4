@@ -207,6 +207,19 @@ class AudioIO {
     }
 
     /**
+     * Phase 2.9: 注册 Worklet PitchFrame 专用回调
+     * @param {Function} callback - (pitchFrame: PitchFrame, timestamp: number) => void
+     */
+    onWorkletPitchFrame(callback) {
+        if (typeof callback !== 'function') {
+            throw new TypeError('[AudioIO] onWorkletPitchFrame callback must be a function');
+        }
+        this.onWorkletPitchFrameCallback = callback;
+        console.log('[AudioIO] ✅ 已注册 Worklet PitchFrame 回调');
+        return this;
+    }
+
+    /**
      * 注册错误回调
      * @param {Function} callback - (type: string, error: Error) => void
      */
@@ -433,11 +446,14 @@ class AudioIO {
 
             case 'pitch-frame':
                 // Phase 2.9: 完整 PitchFrame 数据 (11 字段)
-                // 传递到 onFrameCallback (主要) 和 onPitchDetectedCallback (兼容)
-                if (this.onFrameCallback) {
+                // 优先使用专用 Worklet 回调，避免与 ScriptProcessor 路径冲突
+                if (this.onWorkletPitchFrameCallback) {
+                    this.onWorkletPitchFrameCallback(data, data.timestamp || performance.now());
+                } else if (this.onFrameCallback) {
+                    // Fallback: 如果未注册专用回调，使用通用 onFrame
                     this.onFrameCallback(data, data.timestamp || performance.now());
                 }
-                // 向后兼容: 也触发 onPitchDetectedCallback
+                // 向后兼容: 也触发 onPitchDetectedCallback (可选)
                 if (this.onPitchDetectedCallback) {
                     this.onPitchDetectedCallback(data);
                 }

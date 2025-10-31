@@ -202,24 +202,21 @@ class KazooApp {
                 debug: true                 // 启用调试日志
             });
 
-            // Phase 2.9: 注册回调 (根据模式区分)
-            // Worklet 模式: onFrame 接收完整 PitchFrame (11字段)
-            // ScriptProcessor 模式: onFrame 接收原始 audioBuffer
-            this.audioIO.onFrame((data, timestamp) => {
-                // 判断数据类型
-                if (data && typeof data === 'object' && 'frequency' in data) {
-                    // Worklet 模式: data 是 PitchFrame
-                    this.onPitchFrame(data, timestamp);
-                } else if (data instanceof Float32Array) {
-                    // ScriptProcessor 模式: data 是 audioBuffer
-                    this.onAudioProcess(data);
-                }
+            // Phase 2.9: 注册专用 Worklet 回调 (避免与 ScriptProcessor 路径冲突)
+            this.audioIO.onWorkletPitchFrame((pitchFrame, timestamp) => {
+                this.handleWorkletPitchFrame(pitchFrame, timestamp);
             });
 
-            // 兼容回调 (Phase 1)
-            this.audioIO.onPitchDetected((pitchInfo) => {
-                // 已通过 onFrame 处理，这里可以忽略或用于调试
-                // console.log('[Debug] onPitchDetected:', pitchInfo);
+            // ScriptProcessor 模式回调 (Fallback)
+            this.audioIO.onFrame((data, timestamp) => {
+                // 只处理 Float32Array (ScriptProcessor 模式)
+                if (data instanceof Float32Array) {
+                    this.onAudioProcess(data);
+                }
+                // 如果是 PitchFrame 对象但未注册 Worklet 回调，也可在此处理
+                else if (data && typeof data === 'object' && 'frequency' in data) {
+                    console.warn('[Main] ⚠️ 收到 PitchFrame 但应使用 onWorkletPitchFrame 回调');
+                }
             });
 
             // 错误处理
@@ -302,14 +299,15 @@ class KazooApp {
         }
 
         // 初始化音高检测 (ScriptProcessor 模式需要)
-        if (audioContext && !pitchDetector.detector) {
+        if (mode !== 'worklet' && audioContext && !pitchDetector.detector) {
             console.log('Initializing pitch detector...');
             pitchDetector.initialize(audioContext.sampleRate);
         }
 
-        // Phase 2: 初始化 ExpressiveFeatures (使用实际参数)
-        if (!this.expressiveFeatures && audioContext && window.ExpressiveFeatures) {
-            console.log('🎨 [Phase 2] Initializing ExpressiveFeatures...');
+        // Phase 2.9: ExpressiveFeatures 仅在 ScriptProcessor 模式下初始化
+        // Worklet 模式下所有特征提取已在 Worklet 线程完成
+        if (mode !== 'worklet' && !this.expressiveFeatures && audioContext && window.ExpressiveFeatures) {
+            console.log('🎨 [Phase 2] Initializing ExpressiveFeatures (ScriptProcessor 模式)...');
             console.log(`  Mode: ${mode}, Buffer: ${bufferSize}, SampleRate: ${audioContext.sampleRate}`);
 
             this.expressiveFeatures = new window.ExpressiveFeatures({
@@ -319,7 +317,7 @@ class KazooApp {
                 mode: mode
             });
 
-            // Phase 2.5: 注入 sourceNode 启用 AnalyserNode FFT (仅 AudioIO 模式)
+            // Phase 2.5: 注入 sourceNode 启用 AnalyserNode FFT (仅 ScriptProcessor 模式)
             if (this.useAudioIO && this.audioIO && this.audioIO.sourceNode) {
                 const success = this.expressiveFeatures.setSourceNode(this.audioIO.sourceNode);
                 if (success) {
@@ -328,6 +326,8 @@ class KazooApp {
                     console.warn('⚠️ [Phase 2.5] AnalyserNode FFT 启用失败，继续使用纯 JS FFT');
                 }
             }
+        } else if (mode === 'worklet') {
+            console.log('✅ [Phase 2.9] Worklet 模式 - 主线程跳过 ExpressiveFeatures (特征已在 Worklet 计算)');
         } else if (!window.ExpressiveFeatures) {
             console.warn('⚠️ [Phase 2] ExpressiveFeatures 模块未加载，跳过初始化');
         }
@@ -425,11 +425,19 @@ class KazooApp {
     }
 
     /**
-     * 音频处理 - Phase 2: 集成 ExpressiveFeatures 完整管线
-     * 数据流: AudioIO → PitchDetector → ExpressiveFeatures → Synth
+     * 音频处理 - ScriptProcessor 模式 (Fallback)
+     * 数据流: ScriptProcessorNode → PitchDetector → ExpressiveFeatures → Synth
+     *
+     * ⚠️ Worklet 模式下此方法不应被调用 (数据已在 Worklet 处理完毕)
      */
     onAudioProcess(audioBuffer) {
         if (!this.isRunning || !this.currentEngine) return;
+
+        // Phase 2.9: Worklet 模式下跳过此流程
+        if (this.audioIO && this.audioIO.mode === 'worklet') {
+            console.warn('[Main] ⚠️ Worklet 模式下不应调用 onAudioProcess - 数据应通过 handleWorkletPitchFrame');
+            return;
+        }
 
         // 性能监控开始
         performanceMonitor.startProcessing();
@@ -479,42 +487,52 @@ class KazooApp {
     }
 
     /**
-     * Phase 2.9: 处理 Worklet 模式的 PitchFrame
-     * Worklet 已经完成所有特征提取 (YIN + FFT + EMA + OnsetDetector)
+     * Phase 2.9: 处理 Worklet 模式的完整 PitchFrame
+     *
+     * 数据流: AudioWorkletNode.process() → YIN + FFT + EMA + OnsetDetector →
+     *         pitch-frame message → onWorkletPitchFrame 回调 → 此方法
+     *
+     * @param {PitchFrame} pitchFrame - 包含 11 个字段的完整音高帧
+     * @param {number} timestamp - 时间戳 (ms)
      */
-    onPitchFrame(pitchFrame, timestamp) {
+    handleWorkletPitchFrame(pitchFrame, timestamp) {
         if (!this.isRunning || !this.currentEngine) return;
 
         // Phase 2.9 调试: 首次调用时打印完整 PitchFrame
-        if (!this._pitchFrameDebugLogged) {
-            console.log('[Main] 🎯 onPitchFrame 首次调用 (Worklet 模式):', pitchFrame);
-            this._pitchFrameDebugLogged = true;
+        if (!this._workletPitchFrameLogged) {
+            console.log('[Main] 🎯 handleWorkletPitchFrame 首次调用:', {
+                pitchFrame,
+                timestamp,
+                fields: Object.keys(pitchFrame)
+            });
+            console.log('[Main] ✅ Worklet 数据流已建立 - 跳过主线程 ExpressiveFeatures');
+            this._workletPitchFrameLogged = true;
         }
 
         // 性能监控开始
         performanceMonitor.startProcessing();
 
-        // 更新显示
+        // 更新 UI 显示
         this.ui.currentNote.textContent = `${pitchFrame.note}${pitchFrame.octave}`;
         this.ui.currentFreq.textContent = `${pitchFrame.frequency.toFixed(1)} Hz`;
         this.ui.confidence.textContent = `${Math.round(pitchFrame.confidence * 100)}%`;
 
-        // 直接传递给合成器 (已包含所有特征)
+        // 直接传递给合成器 (PitchFrame 已包含所有表现力特征)
         if (this.currentEngine.processPitchFrame) {
             this.currentEngine.processPitchFrame(pitchFrame);
         } else if (this.currentEngine.processPitch) {
-            // 回退到基础 API (如果合成器不支持 PitchFrame)
+            // Fallback: 合成器不支持完整 PitchFrame API
             this.currentEngine.processPitch(pitchFrame);
         }
 
-        // 可视化
+        // 更新可视化
         this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
         performanceMonitor.endProcessing();
-
-        // 更新性能指标
         performanceMonitor.updateFPS();
+
+        // 更新延迟显示
         const metrics = performanceMonitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }

@@ -97,7 +97,8 @@ class SynthesizerEngine {
         });
 
         // Phase 2.8: 噪声层 (气声效果)
-        this.noiseSource = new Tone.Noise('white').start();
+        // Phase 2.9: 延迟 start() 避免 AudioContext 警告
+        this.noiseSource = new Tone.Noise('white');
         this.noiseGain = new Tone.Gain(0);  // 初始静音
         this.noiseFilter = new Tone.Filter({
             type: 'bandpass',
@@ -109,6 +110,11 @@ class SynthesizerEngine {
         this.noiseSource.connect(this.noiseFilter);
         this.noiseFilter.connect(this.noiseGain);
         this.noiseGain.connect(this.filter);
+
+        // Phase 2.9: 启动噪声源 (在用户手势后)
+        if (this.noiseSource.state !== 'started') {
+            this.noiseSource.start();
+        }
 
         console.log('[Synthesizer] Effects chain created (Phase 2.8: with noise layer)');
     }

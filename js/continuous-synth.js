@@ -172,7 +172,8 @@ class ContinuousSynthEngine {
         }).toDestination();
 
         // Phase 2.7: 噪声层 (用于 breathiness 特征)
-        this.noiseSource = new Tone.Noise('white').start();
+        // Phase 2.9: 延迟 start() 到 initialize()，避免 AudioContext 警告
+        this.noiseSource = new Tone.Noise('white');
         this.noiseGain = new Tone.Gain(0); // 初始静音
         this.noiseFilter = new Tone.Filter({
             type: 'bandpass',
@@ -204,7 +205,14 @@ class ContinuousSynthEngine {
      * 初始化合成器
      */
     async initialize() {
+        // Phase 2.9: 确保在用户手势后启动 AudioContext
         await Tone.start();
+
+        // Phase 2.9: 启动噪声源 (之前在构造函数中启动会触发警告)
+        if (this.noiseSource && this.noiseSource.state !== 'started') {
+            this.noiseSource.start();
+        }
+
         this.createSynthesizer(this.currentInstrument);
         console.log('[ContinuousSynth] ✓ Ready');
     }

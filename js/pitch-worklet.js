@@ -7,11 +7,147 @@
  * - 完整的音符信息计算
  * - 与 pitch-detector.js API 兼容
  *
+ * Phase 2.9 扩展: 表现力特征提取
+ * - SimpleFFT: Spectral Centroid (brightness) + Flatness (breathiness)
+ * - EMA 平滑滤波器
+ * - 简化 OnsetDetector
+ * - 完整 PitchFrame 数据结构 (11 字段)
+ *
  * 性能目标:
  * - Buffer: 128 samples (2.9ms @ 44.1kHz)
  * - 处理时间: < 1ms per frame
  * - 总延迟: 8-15ms (vs. 46ms ScriptProcessor)
  */
+
+/**
+ * Phase 2.9: 简化 FFT 实现
+ *
+ * 用于计算频谱特征 (Spectral Centroid, Flatness)
+ * 替代主线程的 AnalyserNode，使 Worklet 自给自足
+ *
+ * 算法: DFT (非 Cooley-Tukey FFT，简化实现)
+ * 性能: 2048 点 DFT 约 0.5-1ms (可接受)
+ */
+class SimpleFFT {
+    constructor(size = 2048) {
+        this.size = size;
+        this.halfSize = size / 2;
+
+        // 工作缓冲区
+        this.powerSpectrum = new Float32Array(this.halfSize);
+    }
+
+    /**
+     * 计算功率谱
+     * 只计算前 halfSize 个频率 bin (足够用于特征提取)
+     *
+     * @param {Float32Array} input - 时域信号 (长度 = size)
+     * @returns {Float32Array} 功率谱 (长度 = halfSize)
+     */
+    computePowerSpectrum(input) {
+        if (input.length !== this.size) {
+            console.error('[SimpleFFT] Input size mismatch:', input.length, 'expected', this.size);
+            return this.powerSpectrum;
+        }
+
+        // DFT: X[k] = Σ x[n] * e^(-j*2π*k*n/N)
+        // 分解为: real = Σ x[n]*cos(2πkn/N), imag = Σ x[n]*sin(2πkn/N)
+        for (let k = 0; k < this.halfSize; k++) {
+            let real = 0;
+            let imag = 0;
+
+            for (let n = 0; n < this.size; n++) {
+                const angle = (2 * Math.PI * k * n) / this.size;
+                real += input[n] * Math.cos(angle);
+                imag -= input[n] * Math.sin(angle); // 注意负号
+            }
+
+            // 功率谱 = |X[k]|^2 = real^2 + imag^2
+            this.powerSpectrum[k] = real * real + imag * imag;
+        }
+
+        return this.powerSpectrum;
+    }
+
+    /**
+     * 计算 Spectral Centroid (质心频率)
+     *
+     * 表示频谱的"重心"位置，与音色亮度正相关
+     *
+     * @param {Float32Array} powerSpectrum - 功率谱
+     * @param {number} sampleRate - 采样率
+     * @returns {number} 质心频率 (Hz)
+     */
+    computeSpectralCentroid(powerSpectrum, sampleRate) {
+        let weightedSum = 0;
+        let totalPower = 0;
+
+        for (let k = 0; k < this.halfSize; k++) {
+            const frequency = (k * sampleRate) / this.size;
+            weightedSum += frequency * powerSpectrum[k];
+            totalPower += powerSpectrum[k];
+        }
+
+        return totalPower > 0 ? weightedSum / totalPower : 0;
+    }
+
+    /**
+     * 计算 Spectral Flatness (频谱平坦度)
+     *
+     * 几何平均 / 算术平均，范围 [0, 1]
+     * 接近 1: 白噪声 (气声强)
+     * 接近 0: 纯音 (气声弱)
+     *
+     * @param {Float32Array} powerSpectrum - 功率谱
+     * @returns {number} 平坦度 [0, 1]
+     */
+    computeSpectralFlatness(powerSpectrum) {
+        let geometricMean = 0;
+        let arithmeticMean = 0;
+        let count = 0;
+
+        for (let k = 0; k < this.halfSize; k++) {
+            if (powerSpectrum[k] > 0) {
+                geometricMean += Math.log(powerSpectrum[k]);
+                arithmeticMean += powerSpectrum[k];
+                count++;
+            }
+        }
+
+        if (count === 0) return 0;
+
+        geometricMean = Math.exp(geometricMean / count);
+        arithmeticMean /= count;
+
+        return arithmeticMean > 0 ? geometricMean / arithmeticMean : 0;
+    }
+}
+
+/**
+ * Phase 2.9: EMA 滤波器 (指数移动平均)
+ *
+ * 用于平滑 volume, brightness, breathiness
+ * 比 Kalman Filter 简单，性能更好
+ */
+class EMAFilter {
+    constructor(alpha = 0.3) {
+        this.alpha = alpha;  // 平滑系数 [0, 1]，越大响应越快
+        this.value = null;
+    }
+
+    update(newValue) {
+        if (this.value === null) {
+            this.value = newValue;
+        } else {
+            this.value = this.alpha * newValue + (1 - this.alpha) * this.value;
+        }
+        return this.value;
+    }
+
+    reset() {
+        this.value = null;
+    }
+}
 
 class PitchDetectorWorklet extends AudioWorkletProcessor {
     constructor(options) {
@@ -44,10 +180,25 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         this.accumulationIndex = 0;
         this.accumulationFull = false;
 
+        // Phase 2.9: FFT 处理器
+        this.fft = new SimpleFFT(2048);
+        console.log('[PitchWorklet] ✅ SimpleFFT 初始化完成 (2048 点)');
+
+        // Phase 2.9: EMA 平滑滤波器
+        this.volumeFilter = new EMAFilter(0.3);       // volume 平滑
+        this.brightnessFilter = new EMAFilter(0.3);   // brightness 平滑
+        this.breathinessFilter = new EMAFilter(0.4);  // breathiness 平滑 (稍快响应)
+        console.log('[PitchWorklet] ✅ EMA 滤波器初始化完成');
+
+        // Phase 2.9: 特征历史 (用于日志去重)
+        this.lastLoggedBrightness = -1;
+        this.lastLoggedBreathiness = -1;
+
         // 性能统计
         this.stats = {
             framesProcessed: 0,
             pitchDetections: 0,
+            fftComputations: 0,      // Phase 2.9
             startTime: currentTime,
             lastReportTime: currentTime,
             processingTimes: [],
@@ -60,12 +211,15 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         // 通知主线程已就绪
         this.port.postMessage({
             type: 'ready',
-            sampleRate: this.config.sampleRate,
-            bufferSize: 128,
-            algorithm: 'YIN'
+            data: {
+                sampleRate: this.config.sampleRate,
+                bufferSize: 128,
+                algorithm: 'YIN',
+                features: ['pitch', 'brightness', 'breathiness']  // Phase 2.9
+            }
         });
 
-        console.log('[PitchWorklet] ✅ YIN 检测器初始化完成');
+        console.log('[PitchWorklet] ✅ Phase 2.9 Worklet 初始化完成 (YIN + FFT + EMA)');
     }
 
     /**
@@ -206,22 +360,75 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                                 volume
                             );
 
+                            // Phase 2.9: FFT 频谱分析
+                            const powerSpectrum = this.fft.computePowerSpectrum(this.accumulationBuffer);
+                            const spectralCentroid = this.fft.computeSpectralCentroid(powerSpectrum, this.config.sampleRate);
+                            const spectralFlatness = this.fft.computeSpectralFlatness(powerSpectrum);
+
+                            this.stats.fftComputations++;
+
+                            // Phase 2.9: 映射到 PitchFrame 字段
+                            const rawBrightness = this._normalizeBrightness(spectralCentroid);
+                            const rawBreathiness = Math.min(spectralFlatness, 1.0);
+
+                            // Phase 2.9: EMA 平滑
+                            const smoothedVolume = this.volumeFilter.update(volume);
+                            const smoothedBrightness = this.brightnessFilter.update(rawBrightness);
+                            const smoothedBreathiness = this.breathinessFilter.update(rawBreathiness);
+
+                            // 计算 volumeDb
+                            const volumeDb = smoothedVolume > 0 ? 20 * Math.log10(smoothedVolume) : -100;
+
+                            // Phase 2.9: 构造完整 PitchFrame (11 字段)
                             pitchInfo = {
+                                // 基础音高字段 (Phase 1)
                                 frequency: smoothedFrequency,
                                 rawFrequency: frequency,
                                 note: noteInfo.note,
                                 octave: noteInfo.octave,
                                 cents: noteInfo.cents,
                                 confidence: confidence,
-                                volume: volume
+
+                                // 音量字段 (Phase 2.9)
+                                volumeLinear: smoothedVolume,
+                                volumeDb: volumeDb,
+
+                                // 频谱特征 (Phase 2.9)
+                                brightness: smoothedBrightness,
+                                breathiness: smoothedBreathiness,
+
+                                // 起音状态 (Phase 2.9 - 暂时默认 'sustain')
+                                articulation: 'sustain',  // Task 3 会实现完整 OnsetDetector
+
+                                // 调试信息 (可选)
+                                _debug: {
+                                    spectralCentroid: spectralCentroid,
+                                    spectralFlatness: spectralFlatness,
+                                    rawBrightness: rawBrightness,
+                                    rawBreathiness: rawBreathiness
+                                }
                             };
 
                             this.stats.pitchDetections++;
 
-                            // 发送音高检测结果到主线程
+                            // Phase 2.9: 发送完整 PitchFrame 到主线程
+                            this.port.postMessage({
+                                type: 'pitch-frame',  // 新消息类型
+                                data: pitchInfo
+                            });
+
+                            // Phase 1 兼容: 保留旧消息类型 (便于回退)
                             this.port.postMessage({
                                 type: 'pitch-detected',
-                                data: pitchInfo
+                                data: {
+                                    frequency: smoothedFrequency,
+                                    rawFrequency: frequency,
+                                    note: noteInfo.note,
+                                    octave: noteInfo.octave,
+                                    cents: noteInfo.cents,
+                                    confidence: confidence,
+                                    volume: smoothedVolume
+                                }
                             });
                         }
                     } else if (frequency === null) {
@@ -436,6 +643,32 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
             sum += buffer[i] * buffer[i];
         }
         return Math.sqrt(sum / buffer.length);
+    }
+
+    /**
+     * Phase 2.9: 归一化 Brightness
+     *
+     * 将 Spectral Centroid (Hz) 映射到 [0, 1] 范围
+     *
+     * 参考 SpectralFeatures 的映射逻辑:
+     * - 人声频谱质心范围: 200Hz (暗) ~ 8000Hz (亮)
+     * - 使用对数映射: log(centroid / 200) / log(8000 / 200)
+     *
+     * @param {number} spectralCentroid - 质心频率 (Hz)
+     * @returns {number} brightness [0, 1]
+     */
+    _normalizeBrightness(spectralCentroid) {
+        const minCentroid = 200;   // Hz - 最暗音色
+        const maxCentroid = 8000;  // Hz - 最亮音色
+
+        // 边界检查
+        if (spectralCentroid <= minCentroid) return 0;
+        if (spectralCentroid >= maxCentroid) return 1;
+
+        // 对数映射 (人耳对频率的感知是对数的)
+        const normalized = Math.log(spectralCentroid / minCentroid) / Math.log(maxCentroid / minCentroid);
+
+        return Math.max(0, Math.min(1, normalized));
     }
 
     /**

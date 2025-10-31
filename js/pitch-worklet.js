@@ -149,6 +149,114 @@ class EMAFilter {
     }
 }
 
+/**
+ * Phase 2.9: 简化起音检测器
+ *
+ * 基于能量突增检测，比 Phase 2.4 的完整版简单
+ * 适用于持续哼唱场景 (不需要 6dB 突增阈值)
+ *
+ * 状态机:
+ * - silence: 音量 < -40dB
+ * - attack: 能量突增 > threshold (或首次有音量)
+ * - sustain: 持续有音量
+ * - release: 音量下降到 silence 前的过渡
+ */
+class SimpleOnsetDetector {
+    constructor(config = {}) {
+        this.energyThreshold = config.energyThreshold ?? 3;  // dB (比 Phase 2.4 的 6dB 更宽松)
+        this.historySize = config.historySize ?? 5;
+        this.silenceThreshold = config.silenceThreshold ?? -40;  // dB
+        this.minStateDuration = config.minStateDuration ?? 50;  // ms
+
+        this.energyHistory = [];
+        this.currentState = 'silence';
+        this.lastStateChange = 0;
+        this.frameCount = 0;
+    }
+
+    /**
+     * 检测起音状态
+     *
+     * @param {number} volumeDb - 当前音量 (dB)
+     * @param {number} currentTime - 当前时间戳 (秒)
+     * @returns {string} 'silence' | 'attack' | 'sustain' | 'release'
+     */
+    detect(volumeDb, currentTime) {
+        this.frameCount++;
+
+        // 更新能量历史
+        this.energyHistory.push(volumeDb);
+        if (this.energyHistory.length > this.historySize) {
+            this.energyHistory.shift();
+        }
+
+        // 计算平均能量
+        const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
+        const energyIncrease = volumeDb - avgEnergy;
+
+        // 时间约束: 状态切换至少间隔 minStateDuration
+        const timeSinceChange = (currentTime - this.lastStateChange) * 1000; // ms
+        const canChangeState = timeSinceChange >= this.minStateDuration;
+
+        let newState = this.currentState;
+
+        // 状态转换逻辑
+        switch (this.currentState) {
+            case 'silence':
+                // silence → attack: 音量超过阈值 + 能量突增
+                if (volumeDb > this.silenceThreshold) {
+                    // 宽松检测: 能量突增 OR 绝对音量足够 (解决持续哼唱无法触发的问题)
+                    if (energyIncrease > this.energyThreshold || volumeDb > -20) {
+                        newState = 'attack';
+                    } else {
+                        // 能量平缓上升 → 直接进入 sustain (跳过 attack)
+                        newState = 'sustain';
+                    }
+                }
+                break;
+
+            case 'attack':
+                // attack → sustain: 持续一段时间后稳定
+                if (canChangeState) {
+                    newState = 'sustain';
+                }
+                break;
+
+            case 'sustain':
+                // sustain → release: 音量开始下降
+                if (volumeDb < this.silenceThreshold + 10) {  // -30dB
+                    newState = 'release';
+                }
+                break;
+
+            case 'release':
+                // release → silence: 音量降到阈值以下
+                if (volumeDb < this.silenceThreshold) {
+                    newState = 'silence';
+                }
+                // release → sustain: 音量又上升了 (重新哼唱)
+                else if (volumeDb > this.silenceThreshold + 15) {  // -25dB
+                    newState = 'sustain';
+                }
+                break;
+        }
+
+        // 更新状态
+        if (newState !== this.currentState) {
+            this.currentState = newState;
+            this.lastStateChange = currentTime;
+        }
+
+        return this.currentState;
+    }
+
+    reset() {
+        this.energyHistory = [];
+        this.currentState = 'silence';
+        this.lastStateChange = 0;
+    }
+}
+
 class PitchDetectorWorklet extends AudioWorkletProcessor {
     constructor(options) {
         super();
@@ -189,6 +297,14 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         this.brightnessFilter = new EMAFilter(0.3);   // brightness 平滑
         this.breathinessFilter = new EMAFilter(0.4);  // breathiness 平滑 (稍快响应)
         console.log('[PitchWorklet] ✅ EMA 滤波器初始化完成');
+
+        // Phase 2.9: 简化起音检测器
+        this.onsetDetector = new SimpleOnsetDetector({
+            energyThreshold: 3,      // dB (宽松阈值，适合持续哼唱)
+            silenceThreshold: -40,   // dB
+            minStateDuration: 50     // ms
+        });
+        console.log('[PitchWorklet] ✅ SimpleOnsetDetector 初始化完成');
 
         // Phase 2.9: 特征历史 (用于日志去重)
         this.lastLoggedBrightness = -1;
@@ -379,6 +495,9 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                             // 计算 volumeDb
                             const volumeDb = smoothedVolume > 0 ? 20 * Math.log10(smoothedVolume) : -100;
 
+                            // Phase 2.9: 起音检测
+                            const articulation = this.onsetDetector.detect(volumeDb, currentTime);
+
                             // Phase 2.9: 构造完整 PitchFrame (11 字段)
                             pitchInfo = {
                                 // 基础音高字段 (Phase 1)
@@ -397,8 +516,8 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                                 brightness: smoothedBrightness,
                                 breathiness: smoothedBreathiness,
 
-                                // 起音状态 (Phase 2.9 - 暂时默认 'sustain')
-                                articulation: 'sustain',  // Task 3 会实现完整 OnsetDetector
+                                // 起音状态 (Phase 2.9)
+                                articulation: articulation,
 
                                 // 调试信息 (可选)
                                 _debug: {

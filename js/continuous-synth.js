@@ -13,15 +13,28 @@
  * 旧: PitchDetector → Note("C4") → triggerAttack("C4") → 固定频率
  * 新: PitchDetector → Frequency(Hz) → 平滑 → oscillator.frequency → 实时跟随
  *
+ * Phase 2.10 P0 修复:
+ * - 乐器预设从代码分离到 instrument-presets.js
+ * - 支持运行时加载自定义音色
+ * - 噪声层参数从集中式配置读取
+ *
  * @class ContinuousSynthEngine
  * @author Kazoo Proto Team
- * @version 2.0.0-alpha
+ * @version 2.0.1-alpha (Phase 2.10)
  */
 
 class ContinuousSynthEngine {
-    constructor() {
-        // 乐器预设配置
-        this.instrumentPresets = {
+    /**
+     * @param {Object} options - 配置选项
+     * @param {Object} options.appConfig - Phase 2.10: 集中式配置对象
+     * @param {Object} options.instrumentPresets - Phase 2.10: 乐器预设对象 (可选)
+     */
+    constructor(options = {}) {
+        // Phase 2.10: 存储集中式配置
+        this.appConfig = options.appConfig || null;
+
+        // Phase 2.10: 乐器预设配置 (从外部加载,向后兼容)
+        this.instrumentPresets = options.instrumentPresets || {
             saxophone: {
                 oscillator: { type: 'sawtooth' },
                 envelope: {
@@ -344,7 +357,7 @@ class ContinuousSynthEngine {
             this.currentFrequency = initialFrequency;
             this.lastUpdateTime = Date.now();
 
-            console.log(`[ContinuousSynth] ▶ Started at ${initialFrequency.toFixed(1)} Hz`);
+            console.log(`[ContinuousSynth] ▶ Started at ${initialFrequency.toFixed(1)} Hz (velocity: ${velocity.toFixed(2)})`);
         } catch (error) {
             console.error('[ContinuousSynth] ❌ Start error:', error);
         }
@@ -408,15 +421,32 @@ class ContinuousSynthEngine {
     /**
      * Phase 2.7 Task 2: 使用 brightness 控制 filter cutoff
      *
+     * 🔥 紧急修复 (2025-01-01): 重新设计映射算法
+     *
+     * 问题: 原算法导致低 brightness (0.07-0.3) → 低 filter cutoff (356-1467 Hz)
+     * 后果: 滤掉所有高频泛音 (2000-8000 Hz),导致声音完全被闷掉
+     *
+     * 行业最佳实践:
+     * - 人声泛音主要在 2000-4000 Hz
+     * - 歌手共振峰 (singer formant) 在 2800-3200 Hz
+     * - Filter cutoff < 2000 Hz 会让声音完全失去清晰度
+     *
+     * 新算法:
+     * - 基线提升: 2000 Hz (确保基本清晰度)
+     * - 动态范围: 2000-8000 Hz (6000 Hz 范围)
+     * - 指数映射: brightness^0.7 (让中低亮度区间变化更明显)
+     *
      * @param {number} brightness - 音色亮度 (0-1, 来自频谱质心)
      */
     updateBrightness(brightness) {
         if (brightness === undefined || brightness === null) return;
 
-        // 非线性映射: brightness^1.5 让低亮度区间变化更细腻
-        // 频率范围: 200Hz (低沉) ~ 8000Hz (明亮)
-        const mappedBrightness = Math.pow(brightness, 1.5);
-        const filterFreq = 200 + mappedBrightness * 7800;
+        // 🔥 新映射算法: 确保滤波器始终高于 2000 Hz
+        // brightness = 0.0 → 2000 Hz (暗但清晰)
+        // brightness = 0.5 → 4243 Hz (中等)
+        // brightness = 1.0 → 8000 Hz (非常亮)
+        const mappedBrightness = Math.pow(brightness, 0.7);  // 指数 0.7 让曲线更平缓
+        const filterFreq = 2000 + mappedBrightness * 6000;
 
         // 平滑过渡 (20ms)
         this.filter.frequency.rampTo(filterFreq, 0.02);
@@ -430,14 +460,19 @@ class ContinuousSynthEngine {
     /**
      * Phase 2.7 Task 3: 使用 breathiness 控制噪声层强度
      *
+     * Phase 2.10 P0 修复: noiseGainMax 从集中式配置读取
+     *
      * @param {number} breathiness - 气声度 (0-1, 来自频谱平坦度)
      * @param {number} frequency - 当前频率 (用于调整噪声滤波器中心频率)
      */
     updateBreathiness(breathiness, frequency) {
         if (breathiness === undefined || breathiness === null) return;
 
-        // 限制噪声最大强度为 30% (避免过度嘈杂)
-        const noiseAmount = Math.min(breathiness * 0.3, 0.3);
+        // Phase 2.10: 从集中式配置读取最大噪声增益
+        const noiseGainMax = this.appConfig?.synthesizer?.noiseGainMax ?? 0.3;
+
+        // 限制噪声最大强度 (避免过度嘈杂)
+        const noiseAmount = Math.min(breathiness * noiseGainMax, noiseGainMax);
 
         // 平滑调整噪声增益 (50ms)
         this.noiseGain.gain.rampTo(noiseAmount, 0.05);
@@ -464,9 +499,16 @@ class ContinuousSynthEngine {
     handleArticulation(articulation, frequency, volume) {
         const previousState = this.lastArticulationState;
 
-        // 状态转换 1: silence/release → attack (新音符开始)
-        if (articulation === 'attack' && (previousState === 'silence' || previousState === 'release')) {
-            console.log('[ContinuousSynth] 🎵 Attack detected - triggering new note');
+        // 状态转换 1: silence/release → attack/sustain (新音符开始)
+        const shouldStart =
+            articulation === 'attack' ||
+            (articulation === 'sustain' && (previousState === 'silence' || previousState === 'release'));
+
+        if (shouldStart) {
+            const startLabel = articulation === 'attack'
+                ? 'Attack detected - triggering new note'
+                : 'Sustain bootstrap - starting note';
+            console.log(`[ContinuousSynth] 🎵 ${startLabel}`);
 
             if (!this.isPlaying) {
                 // 启动合成器

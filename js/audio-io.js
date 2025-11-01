@@ -35,9 +35,13 @@ class AudioIO {
             debug: false             // 调试模式
         };
 
+        // Phase 2.10: 存储主线程的集中式配置 (用于序列化到 Worklet)
+        this.appConfig = null;  // 来自 configManager.get()
+
         // 回调函数
         this.onFrameCallback = null;           // 原始音频帧回调 (所有模式)
         this.onPitchDetectedCallback = null;   // 音高检测回调 (仅 Worklet 模式)
+        this.onWorkletPitchFrameCallback = null; // Phase 2.9: Worklet PitchFrame 专用回调
         this.onErrorCallback = null;
         this.onStateChangeCallback = null;
 
@@ -58,9 +62,16 @@ class AudioIO {
      * @param {number} options.workletBufferSize - 缓冲大小 (AudioWorklet)
      * @param {boolean} options.useWorklet - 是否使用 AudioWorklet
      * @param {string} options.latencyHint - 延迟提示
+     * @param {Object} options.appConfig - Phase 2.10: 集中式配置对象 (来自 configManager)
      */
     configure(options = {}) {
         console.log('[AudioIO] 配置音频系统:', options);
+
+        // Phase 2.10: 保存集中式配置
+        if (options.appConfig) {
+            this.appConfig = options.appConfig;
+            console.log('[AudioIO] ✅ 已接收集中式配置');
+        }
 
         this.config = {
             ...this.config,
@@ -305,6 +316,72 @@ class AudioIO {
     // ==================== 私有方法 ====================
 
     /**
+     * Phase 2.10: 序列化配置并下发到 Worklet
+     *
+     * ⚠️ 关键修复: 将主线程集中式配置转换为 Worklet 可理解的参数
+     * 避免 Worklet 使用硬编码值,确保配置一致性
+     *
+     * @private
+     * @returns {Object} Worklet 配置对象
+     */
+    _serializeConfigForWorklet() {
+        // 如果没有集中式配置,使用回退默认值
+        if (!this.appConfig) {
+            console.warn('[AudioIO] ⚠️ 未提供 appConfig,使用回退默认值');
+            return {
+                sampleRate: this.audioContext.sampleRate,
+                algorithm: 'YIN',
+                threshold: 0.1,  // YIN 算法内部阈值 (固定)
+                clarityThreshold: 0.85,  // 音高置信度阈值
+                minFrequency: 80,
+                maxFrequency: 800,
+                smoothingSize: 5,
+                minVolumeThreshold: 0.01
+            };
+        }
+
+        // Phase 2.10: 从集中式配置映射到 Worklet 参数
+        const config = this.appConfig;
+        const workletConfig = {
+            // 基础参数
+            sampleRate: this.audioContext.sampleRate,
+            algorithm: 'YIN',
+
+            // 音高检测参数 (从 config.pitchDetector 映射)
+            threshold: 0.1,  // YIN 算法内部阈值 (固定,不暴露给用户)
+            clarityThreshold: config.pitchDetector?.clarityThreshold ?? 0.85,
+            minFrequency: config.pitchDetector?.minFrequency ?? 80,
+            maxFrequency: config.pitchDetector?.maxFrequency ?? 800,
+
+            // 平滑参数 (从 config.smoothing 映射)
+            smoothingSize: 5,  // 中值滤波窗口 (固定)
+
+            // 音量阈值
+            minVolumeThreshold: 0.005,  // 🔥 临时降低 (iPhone 麦克风音量小)
+
+            // Phase 2.9: EMA 滤波器参数 (用于 Worklet 内部平滑)
+            volumeAlpha: config.smoothing?.volume?.alpha ?? 0.3,
+            brightnessAlpha: config.smoothing?.brightness?.alpha ?? 0.3,
+            breathinessAlpha: 0.4,  // 固定值
+
+            // Phase 2.9: 起音检测参数
+            energyThreshold: config.onset?.energyThreshold ?? 3,
+            silenceThreshold: config.onset?.silenceThreshold ?? -40,
+            minStateDuration: config.onset?.attackDuration ?? 50
+        };
+
+        console.log('[AudioIO] 📋 配置映射完成:', {
+            from: 'ConfigManager',
+            to: 'Worklet',
+            clarityThreshold: workletConfig.clarityThreshold,
+            minFrequency: workletConfig.minFrequency,
+            maxFrequency: workletConfig.maxFrequency
+        });
+
+        return workletConfig;
+    }
+
+    /**
      * 初始化 AudioContext
      * @private
      */
@@ -389,24 +466,21 @@ class AudioIO {
             // 3. 监听 Worklet 消息
             this.processorNode.port.onmessage = this._handleWorkletMessage.bind(this);
 
-            // 4. 发送初始配置
+            // 4. 发送初始配置 (Phase 2.10: 从 main.js 传入的集中式配置)
+            // ⚠️ 关键修复: 将主线程配置序列化并下发到 Worklet
+            const workletConfig = this._serializeConfigForWorklet();
             this.processorNode.port.postMessage({
                 type: 'config',
-                data: {
-                    sampleRate: this.audioContext.sampleRate,
-                    algorithm: 'YIN',
-                    threshold: 0.1,
-                    minFrequency: 80,
-                    maxFrequency: 800,
-                    smoothingSize: 5,
-                    minVolumeThreshold: 0.01
-                }
+                data: workletConfig
             });
+            console.log('[AudioIO] 📤 配置已下发到 Worklet:', workletConfig);
 
             // 5. 连接节点链路
+            // Phase 2.10: 仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
+            // 合成器会单独连接到 destination 输出音色
             this.sourceNode.connect(this.processorNode);
-            this.processorNode.connect(this.audioContext.destination);
-            console.log('🔗 AudioWorklet 链路: Mic → WorkletNode → Destination');
+            // REMOVED: this.processorNode.connect(this.audioContext.destination);
+            console.log('🔗 AudioWorklet 链路: Mic → WorkletNode (分析用，不直接播放)');
 
             console.log('✅ AudioWorklet 处理链路已建立');
 
@@ -540,10 +614,12 @@ class AudioIO {
         };
 
         // 连接节点链路
+        // Phase 2.10: 仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
+        // 合成器会单独连接到 destination 输出音色
         this.sourceNode.connect(this.processorNode);
-        this.processorNode.connect(this.audioContext.destination);
+        // REMOVED: this.processorNode.connect(this.audioContext.destination);
 
-        console.log('✅ ScriptProcessor 链路已建立');
+        console.log('✅ ScriptProcessor 链路已建立 (分析用，不直接播放)');
     }
 
     /**

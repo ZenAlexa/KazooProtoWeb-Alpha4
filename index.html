@@ -235,9 +235,14 @@
         // 动态加载 ExpressiveFeatures 并暴露到全局
         import { ExpressiveFeatures } from './js/expressive-features.js';
         window.ExpressiveFeatures = ExpressiveFeatures;
+
+        // Phase 2.10 P0: 加载乐器预设配置并暴露到全局
+        import instrumentPresetManager from './js/config/instrument-presets.js';
+        window.instrumentPresetManager = instrumentPresetManager;
     </script>
 
-    <script src="js/main.js"></script>
+    <!-- Phase 2.10: 主应用 (ES Module) -->
+    <script type="module" src="js/main.js"></script>
     <!-- 注意：不再加载 calibration.js -->
 </body>
 </html>

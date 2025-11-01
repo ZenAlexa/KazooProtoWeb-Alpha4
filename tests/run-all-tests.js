@@ -70,6 +70,12 @@ const testSuites = [
         file: 'expressive-features.test.js',
         phase: '2.6',
         description: 'ExpressiveFeatures 完整管线'
+    },
+    {
+        name: 'Phase 2.10: 配置系统集成',
+        file: 'config-integration.test.js',
+        phase: '2.10',
+        description: '端到端配置集成测试'
     }
 ];
 

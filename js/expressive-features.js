@@ -23,62 +23,71 @@ export class ExpressiveFeatures {
   /**
    * 构造函数
    *
-   * @param {Object} [config={}] - 配置对象
-   * @param {AudioContext} [config.audioContext] - Web Audio API 上下文 (Phase 2.5 需要)
-   * @param {number} [config.sampleRate=44100] - 采样率
-   * @param {number} [config.bufferSize=2048] - 缓冲区大小
-   * @param {string} [config.mode='script-processor'] - 音频模式
+   * @param {Object} [options={}] - 配置对象
+   * @param {AudioContext} [options.audioContext] - Web Audio API 上下文 (Phase 2.5 需要)
+   * @param {number} [options.sampleRate=44100] - 采样率
+   * @param {number} [options.bufferSize=2048] - 缓冲区大小
+   * @param {string} [options.mode='script-processor'] - 音频模式
+   * @param {Object} [options.config] - Phase 2.10: 集中式配置对象
    */
-  constructor(config = {}) {
-    this.audioContext = config.audioContext || null;
-    this.sampleRate = config.sampleRate || 44100;
-    this.bufferSize = config.bufferSize || 2048;
-    this.mode = config.mode || 'script-processor';
+  constructor(options = {}) {
+    this.audioContext = options.audioContext || null;
+    this.sampleRate = options.sampleRate || 44100;
+    this.bufferSize = options.bufferSize || 2048;
+    this.mode = options.mode || 'script-processor';
+
+    // Phase 2.10: 使用集中式配置或回退到默认值
+    const appConfig = options.config;
 
     // Phase 2.6: 初始化平滑滤波器
     this.smoothingFilters = {
       // Kalman Filter 用于 cents 平滑 (高精度音高)
       cents: new KalmanFilter({
-        processNoise: 0.001,      // Q: 过程噪声 (越小越平滑)
-        measurementNoise: 0.1,    // R: 测量噪声 (越大越平滑)
-        initialEstimate: 0,       // 初始估计值
-        initialError: 1           // 初始误差
+        processNoise: appConfig?.smoothing.kalman.processNoise ?? 0.001,
+        measurementNoise: appConfig?.smoothing.kalman.measurementNoise ?? 0.1,
+        initialEstimate: appConfig?.smoothing.kalman.initialEstimate ?? 0,
+        initialError: appConfig?.smoothing.kalman.initialError ?? 1
       }),
       // EMA Filter 用于音量平滑
       volumeDb: new EMAFilter({
-        alpha: 0.3                // 平滑系数 (越小越平滑)
+        alpha: appConfig?.smoothing.volume.alpha ?? 0.3
       }),
       // EMA Filter 用于亮度平滑
       brightness: new EMAFilter({
-        alpha: 0.2                // 平滑系数
+        alpha: appConfig?.smoothing.brightness.alpha ?? 0.2
       })
     };
 
-    // Phase 2.6: 初始化起音检测器
+    // Phase 2.6: 初始化起音检测器 (Phase 2.10: 完整参数映射)
     this.onsetDetector = new OnsetDetector({
       sampleRate: this.sampleRate,
-      energyThreshold: 6,         // dB 阈值 (音量增加超过 6dB 认为是 attack)
-      silenceThreshold: -40,      // dB 阈值 (低于 -40dB 认为是静音)
-      attackHoldTime: 50,         // ms (attack 状态最少持续时间)
-      releaseHoldTime: 100,       // ms (release 到 silence 的延迟)
-      debug: false
+      energyThreshold: appConfig?.onset.energyThreshold ?? 6,
+      silenceThreshold: appConfig?.onset.silenceThreshold ?? -40,
+      attackDuration: appConfig?.onset.attackDuration ?? 50,
+      minSilenceDuration: appConfig?.onset.minSilenceDuration ?? 100,
+      timeWindow: appConfig?.onset.timeWindow ?? 3,
+      debug: appConfig?.onset.debug ?? false
     });
 
-    // Phase 2.5: 初始化 SpectralFeatures
+    // Phase 2.5: 初始化 SpectralFeatures (Phase 2.10: 完整参数映射)
     this.spectralFeatures = null;
     if (this.audioContext) {
       this.spectralFeatures = new SpectralFeatures({
         audioContext: this.audioContext,
-        fftSize: 2048,
+        fftSize: appConfig?.spectral.fftSize ?? 2048,
         sampleRate: this.sampleRate,
-        fftInterval: 2  // 每 2 帧运行一次 FFT (性能优化)
+        fftInterval: appConfig?.spectral.fftInterval ?? 2,
+        minFrequency: appConfig?.spectral.minFrequency ?? 80,
+        maxFrequency: appConfig?.spectral.maxFrequency ?? 8000
       });
     } else {
       // 降级到纯 JS FFT (Node.js 测试或无 audioContext)
       this.spectralFeatures = new SpectralFeatures({
-        fftSize: 2048,
+        fftSize: appConfig?.spectral.fftSize ?? 2048,
         sampleRate: this.sampleRate,
-        fftInterval: 2
+        fftInterval: appConfig?.spectral.fftInterval ?? 2,
+        minFrequency: appConfig?.spectral.minFrequency ?? 80,
+        maxFrequency: appConfig?.spectral.maxFrequency ?? 8000
       });
     }
 
@@ -108,12 +117,13 @@ export class ExpressiveFeatures {
       avgSpectralTime: 0
     };
 
-    console.log('[ExpressiveFeatures] 初始化 (Phase 2.6 完整版本)');
+    console.log('[ExpressiveFeatures] 初始化 (Phase 2.10 - 集中式配置)');
     console.log(`  模式: ${this.mode}`);
     console.log(`  采样率: ${this.sampleRate} Hz`);
     console.log(`  缓冲区: ${this.bufferSize} 样本`);
     console.log(`  AudioContext: ${this.audioContext ? '✅ 可用 (支持 AnalyserNode FFT)' : '❌ 未提供'}`);
     console.log('  子模块: ✅ SmoothingFilters, ✅ OnsetDetector, ✅ SpectralFeatures');
+    console.log(`  配置来源: ${appConfig ? '✅ 集中式配置' : '⚠️ 回退默认值'}`);
   }
 
   /**

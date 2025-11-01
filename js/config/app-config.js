@@ -16,7 +16,8 @@
 /**
  * @typedef {Object} AudioEngineConfig
  * @property {number} sampleRate - 采样率 (Hz), 影响: 质量↑/CPU↑/延迟↓
- * @property {number} bufferSize - 缓冲区大小 (samples), 影响: 延迟↓/稳定性↓/CPU↑
+ * @property {number} bufferSize - 缓冲区大小 (samples) for ScriptProcessor, 影响: 延迟↓/稳定性↓/CPU↑
+ * @property {number} workletBufferSize - Worklet 缓冲区大小 (固定 128 样本)
  * @property {boolean} useWorklet - 使用 AudioWorklet (true) 或 ScriptProcessor (false)
  */
 
@@ -61,8 +62,8 @@
  * @typedef {Object} SpectralFeaturesConfig
  * @property {number} fftSize - FFT 大小 (bins), 影响: 频率分辨率↑/CPU↑
  * @property {number} fftInterval - FFT 间隔 (帧), 影响: CPU↓/更新频率↓
- * @property {number} minFreq - 分析频率下限 (Hz), 影响: 分析范围/CPU
- * @property {number} maxFreq - 分析频率上限 (Hz), 影响: 分析范围/CPU
+ * @property {number} minFrequency - 分析频率下限 (Hz), 影响: 分析范围/CPU
+ * @property {number} maxFrequency - 分析频率上限 (Hz), 影响: 分析范围/CPU
  */
 
 /**
@@ -107,7 +108,8 @@ const DEFAULT_CONFIG = {
   // ─────────────────────────────────────────────────────────────────────────
   audio: {
     sampleRate: 44100,           // 44.1kHz (CD 质量)
-    bufferSize: 2048,            // ~46ms 延迟 @ 44.1kHz
+    bufferSize: 2048,            // ~46ms 延迟 @ 44.1kHz (ScriptProcessor)
+    workletBufferSize: 128,      // Worklet 缓冲区大小 (固定 128 样本)
     useWorklet: true             // AudioWorklet (低延迟)
   },
 
@@ -116,8 +118,8 @@ const DEFAULT_CONFIG = {
   // ─────────────────────────────────────────────────────────────────────────
   pitchDetector: {
     clarityThreshold: 0.85,      // YIN 清晰度阈值 (平衡误检/漏检)
-    minFrequency: 80,            // E2 (男低音)
-    maxFrequency: 1000           // C6 (覆盖大部分人声)
+    minFrequency: 50,            // 🔥 修复: 50Hz (G1) - 覆盖男低音 C2(65Hz) + 容差
+    maxFrequency: 1500           // 🔥 修复: 1500Hz (覆盖女高音 + 唱歌高音区)
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -161,8 +163,8 @@ const DEFAULT_CONFIG = {
   spectral: {
     fftSize: 2048,               // FFT 大小 (频率分辨率: 44100/2048 = 21.5 Hz/bin)
     fftInterval: 2,              // FFT 间隔 (每 2 帧运行一次, 节省 50% CPU)
-    minFreq: 80,                 // 分析频率下限 (Hz)
-    maxFreq: 8000                // 分析频率上限 (Hz) - 语音相关频段
+    minFrequency: 80,            // 分析频率下限 (Hz)
+    maxFrequency: 8000           // 分析频率上限 (Hz) - 语音相关频段
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -197,7 +199,8 @@ const DEFAULT_CONFIG = {
 const LOW_LATENCY_PRESET = {
   audio: {
     sampleRate: 48000,
-    bufferSize: 512,             // ~10ms 延迟
+    bufferSize: 512,             // ~10ms 延迟 (ScriptProcessor)
+    workletBufferSize: 128,      // Worklet 固定 128 样本
     useWorklet: true
   },
   smoothing: {
@@ -213,8 +216,8 @@ const LOW_LATENCY_PRESET = {
   spectral: {
     fftSize: 1024,               // 更小 FFT
     fftInterval: 2,
-    minFreq: 80,
-    maxFreq: 8000
+    minFrequency: 80,
+    maxFrequency: 8000
   }
 };
 
@@ -225,7 +228,8 @@ const LOW_LATENCY_PRESET = {
 const HIGH_QUALITY_PRESET = {
   audio: {
     sampleRate: 48000,
-    bufferSize: 4096,            // ~85ms 延迟，高稳定性
+    bufferSize: 4096,            // ~85ms 延迟，高稳定性 (ScriptProcessor)
+    workletBufferSize: 128,      // Worklet 固定 128 样本
     useWorklet: true
   },
   pitchDetector: {
@@ -246,8 +250,8 @@ const HIGH_QUALITY_PRESET = {
   spectral: {
     fftSize: 4096,               // 高频率分辨率
     fftInterval: 1,              // 每帧分析
-    minFreq: 80,
-    maxFreq: 8000
+    minFrequency: 80,
+    maxFrequency: 8000
   }
 };
 
@@ -258,7 +262,8 @@ const HIGH_QUALITY_PRESET = {
 const POWER_SAVING_PRESET = {
   audio: {
     sampleRate: 22050,           // 降低采样率
-    bufferSize: 2048,
+    bufferSize: 2048,            // ScriptProcessor 缓冲区
+    workletBufferSize: 128,      // Worklet 固定 128 样本 (不使用)
     useWorklet: false            // 兼容旧浏览器
   },
   pitchDetector: {
@@ -279,8 +284,8 @@ const POWER_SAVING_PRESET = {
   spectral: {
     fftSize: 1024,               // 降低 FFT 大小
     fftInterval: 4,              // 仅 25% 帧运行 FFT
-    minFreq: 100,
-    maxFreq: 4000
+    minFrequency: 100,
+    maxFrequency: 4000
   },
   performance: {
     enableStats: false,          // 禁用统计

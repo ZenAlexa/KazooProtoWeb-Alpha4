@@ -4,7 +4,21 @@
  *
  * Phase 1: 低延迟音频基础
  * 提取配置常量，便于 AudioWorklet 迁移和 A/B 测试
+ *
+ * ⚠️ DEPRECATED (Phase 2.10):
+ * 本文件已被废弃，请使用集中式配置系统:
+ *   import configManager from './config/app-config.js';
+ *   const config = configManager.load();
+ *
+ * 完整文档:
+ *   - js/config/README.md
+ *   - docs/CONFIGURATION.md
+ *   - docs/CONFIG_EXAMPLES.md
+ *
+ * 本文件保留仅为向后兼容，将在 Phase 3 移除。
  */
+
+console.warn('[audio-config.js] ⚠️ DEPRECATED: Please use js/config/app-config.js instead');
 
 const AUDIO_CONFIG = {
     // === 采样配置 ===

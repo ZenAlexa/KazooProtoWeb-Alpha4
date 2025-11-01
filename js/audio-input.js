@@ -190,10 +190,12 @@ class AudioInputManager {
             console.warn('⚠️  ScriptProcessor 已废弃，Phase 1 将迁移到 AudioWorklet');
 
             // 连接音频节点链
+            // Phase 2.10: 仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
+            // 合成器会单独连接到 destination 输出音色
             this.microphone.connect(this.analyser);
             this.analyser.connect(this.scriptProcessor);
-            this.scriptProcessor.connect(this.audioContext.destination);
-            console.log('🔗 音频链路: Mic → Analyser → ScriptProcessor → Destination');
+            // REMOVED: this.scriptProcessor.connect(this.audioContext.destination);
+            console.log('🔗 音频链路: Mic → Analyser → ScriptProcessor (分析用，不直接播放)');
 
             // 设置音频处理回调
             this.scriptProcessor.onaudioprocess = (event) => {

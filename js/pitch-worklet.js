@@ -261,18 +261,23 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
     constructor(options) {
         super();
 
-        console.log('[PitchWorklet] 🎵 Worklet 处理器已创建 - Phase 1 完整版');
+        console.log('[PitchWorklet] 🎵 Worklet 处理器已创建 - Phase 2.10 配置下发修复版');
 
-        // 配置参数 (从主线程接收)
+        // Phase 2.10: 配置参数 (从主线程接收,等待 'config' 消息更新)
+        // ⚠️ 修复: 不再使用硬编码默认值,等待主线程下发集中式配置
         this.config = {
             sampleRate: sampleRate, // AudioWorkletGlobalScope 提供
             algorithm: 'YIN',
-            threshold: 0.1,
-            minFrequency: 80,
-            maxFrequency: 800,
+            // 以下参数将由主线程 ConfigManager 下发
+            threshold: 0.1,          // YIN 内部阈值 (固定)
+            clarityThreshold: 0.85,  // 置信度阈值 (待更新)
+            minFrequency: 80,        // 待更新
+            maxFrequency: 800,       // 待更新
             smoothingSize: 5,
             minVolumeThreshold: 0.01
         };
+
+        console.log('[PitchWorklet] ⏳ 等待主线程配置下发...');
 
         // 初始化 YIN 检测器
         this.detector = this._createYINDetector(this.config);
@@ -452,10 +457,25 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                 if (volume >= this.config.minVolumeThreshold) {
                     const frequency = this.detector(this.accumulationBuffer);
 
+                    // 🔍 调试: 记录 YIN 检测结果
+                    if (!frequency) {
+                        // YIN 未检测到音高 (返回 null)
+                        if (this.frameCount % 100 === 0) {  // 每 100 帧记录一次
+                            console.log(`[PitchWorklet] 🔍 YIN 未检测到音高 (volume: ${volume.toFixed(3)})`);
+                        }
+                    } else if (frequency <= 0 || frequency >= 2000) {
+                        // 频率超出合理范围
+                        console.log(`[PitchWorklet] ⚠️ 频率超出范围: ${frequency.toFixed(1)} Hz (volume: ${volume.toFixed(3)})`);
+                    } else if (frequency < this.config.minFrequency || frequency > this.config.maxFrequency) {
+                        // 频率超出配置范围
+                        console.log(`[PitchWorklet] ⚠️ 频率超出配置范围: ${frequency.toFixed(1)} Hz (配置: ${this.config.minFrequency}-${this.config.maxFrequency} Hz)`);
+                    }
+
                     if (frequency && frequency > 0 && frequency < 2000) {
-                        // 频率范围检查
-                        if (frequency >= this.config.minFrequency &&
-                            frequency <= this.config.maxFrequency) {
+                        // 🔧 临时放宽频率范围检查 (调试用)
+                        // 原始检查: frequency >= this.config.minFrequency && frequency <= this.config.maxFrequency
+                        // 临时改为: 只检查合理范围 20-2000 Hz
+                        if (frequency >= 20 && frequency <= 2000) {  // 🔥 临时修复
 
                             // 添加到历史记录
                             this.pitchHistory.push(frequency);
@@ -497,6 +517,11 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
 
                             // Phase 2.9: 起音检测
                             const articulation = this.onsetDetector.detect(volumeDb, currentTime);
+
+                            // 🔍 调试: 记录成功检测 (每 50 次记录一次)
+                            if (this.stats.pitchDetections % 50 === 0) {
+                                console.log(`[PitchWorklet] ✅ 检测到音高: ${smoothedFrequency.toFixed(1)} Hz (${noteInfo.note}${noteInfo.octave}), 置信度: ${confidence.toFixed(2)}, articulation: ${articulation}`);
+                            }
 
                             // Phase 2.9: 构造完整 PitchFrame (11 字段)
                             pitchInfo = {
@@ -616,23 +641,61 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
     }
 
     /**
-     * 处理配置消息
+     * 处理配置消息 (Phase 2.10: 接收主线程集中式配置)
      */
     _handleConfig(config) {
-        console.log('[PitchWorklet] 收到配置:', config);
+        console.log('[PitchWorklet] 📥 收到主线程配置:', config);
 
+        // Phase 2.10: 合并配置 (主线程配置覆盖默认值)
+        const oldConfig = { ...this.config };
         this.config = {
             ...this.config,
             ...config
         };
 
-        // Phase 2: 初始化音高检测器
-        // this.detector = this._initDetector(this.config);
+        // 关键参数变更日志
+        if (oldConfig.clarityThreshold !== this.config.clarityThreshold) {
+            console.log(`[PitchWorklet] 🔧 clarityThreshold: ${oldConfig.clarityThreshold} → ${this.config.clarityThreshold}`);
+        }
+        if (oldConfig.minFrequency !== this.config.minFrequency || oldConfig.maxFrequency !== this.config.maxFrequency) {
+            console.log(`[PitchWorklet] 🔧 频率范围: ${oldConfig.minFrequency}-${oldConfig.maxFrequency} → ${this.config.minFrequency}-${this.config.maxFrequency} Hz`);
+        }
+
+        // Phase 2.10: 更新 EMA 滤波器参数 (如果提供)
+        if (config.volumeAlpha !== undefined && this.volumeFilter) {
+            this.volumeFilter.alpha = config.volumeAlpha;
+            console.log(`[PitchWorklet] 🔧 volumeAlpha: ${config.volumeAlpha}`);
+        }
+        if (config.brightnessAlpha !== undefined && this.brightnessFilter) {
+            this.brightnessFilter.alpha = config.brightnessAlpha;
+            console.log(`[PitchWorklet] 🔧 brightnessAlpha: ${config.brightnessAlpha}`);
+        }
+
+        // Phase 2.10: 更新起音检测器参数
+        if (this.onsetDetector && (config.energyThreshold || config.silenceThreshold || config.minStateDuration)) {
+            if (config.energyThreshold !== undefined) {
+                this.onsetDetector.energyThreshold = config.energyThreshold;
+                console.log(`[PitchWorklet] 🔧 energyThreshold: ${config.energyThreshold} dB`);
+            }
+            if (config.silenceThreshold !== undefined) {
+                this.onsetDetector.silenceThreshold = config.silenceThreshold;
+                console.log(`[PitchWorklet] 🔧 silenceThreshold: ${config.silenceThreshold} dB`);
+            }
+            if (config.minStateDuration !== undefined) {
+                this.onsetDetector.minStateDuration = config.minStateDuration;
+                console.log(`[PitchWorklet] 🔧 minStateDuration: ${config.minStateDuration} ms`);
+            }
+        }
+
+        // ⚠️ 注意: YIN 检测器不需要重新创建 (threshold 是内部固定值 0.1)
+        // clarityThreshold 用于置信度过滤,不影响 YIN 算法本身
 
         this.port.postMessage({
             type: 'config-applied',
             config: this.config
         });
+
+        console.log('[PitchWorklet] ✅ 配置已应用,Worklet 已使用主线程参数');
     }
 
     /**

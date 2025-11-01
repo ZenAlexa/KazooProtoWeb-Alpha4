@@ -4,10 +4,17 @@
  *
  * Phase 1: 集成 AudioIO 低延迟音频抽象层
  * Phase 2: 集成 ExpressiveFeatures 表现力特征提取管线
+ * Phase 2.10: 集成集中式配置管理系统
  */
+
+import configManager from './config/app-config.js';
+
 class KazooApp {
     constructor() {
         this.isRunning = false;
+
+        // Phase 2.10: 加载应用配置 (默认配置)
+        this.config = null;  // 由 initialize() 加载
 
         // Phase 1: 音频系统选择
         // Feature Flag: 使用 AudioIO (支持 Worklet) 或 audioInputManager (Legacy)
@@ -63,6 +70,33 @@ class KazooApp {
      */
     async initialize() {
         console.log('Initializing Kazoo App (No-Calibration Version)...');
+
+        // Phase 2.10: 加载集中式配置
+        try {
+            this.config = configManager.load();  // 默认配置
+            console.log('[Config] Loaded default configuration:', {
+                sampleRate: this.config.audio.sampleRate,
+                bufferSize: this.config.audio.bufferSize,
+                useWorklet: this.config.audio.useWorklet
+            });
+        } catch (error) {
+            console.error('[Config] Failed to load configuration:', error);
+            console.error('[Config] Using emergency fallback values');
+            // 真正的回退: 使用硬编码的最小可用配置 (必须与 app-config.js 结构一致)
+            this.config = {
+                audio: { sampleRate: 44100, bufferSize: 2048, workletBufferSize: 128, useWorklet: true },
+                pitchDetector: { clarityThreshold: 0.9, minFrequency: 80, maxFrequency: 800 },
+                smoothing: {
+                    kalman: { processNoise: 0.001, measurementNoise: 0.1, initialEstimate: 0, initialError: 1 },
+                    volume: { alpha: 0.3 },
+                    brightness: { alpha: 0.2 }
+                },
+                onset: { energyThreshold: 6, silenceThreshold: -40, attackDuration: 50, minSilenceDuration: 100, timeWindow: 3, debug: false },
+                spectral: { fftSize: 2048, fftInterval: 2, minFrequency: 80, maxFrequency: 8000 },
+                synthesizer: { pitchBendRange: 100, filterCutoffRange: { min: 200, max: 8000 }, noiseGainMax: 0.3 },
+                performance: { enableStats: true, logLevel: 'info' }
+            };
+        }
 
         // 检查兼容性
         this.checkCompatibility();
@@ -189,17 +223,17 @@ class KazooApp {
         if (!this.audioIO) {
             this.audioIO = new AudioIO();
 
-            // 配置 AudioIO
-            // Phase 2.9: AudioWorklet 路径恢复完成
-            // Worklet 端已实现完整 ExpressiveFeatures (FFT + EMA + OnsetDetector)
+            // Phase 2.10: 使用集中式配置 + 下发到 Worklet
             this.audioIO.configure({
-                useWorklet: true,           // Phase 2.9: 启用 AudioWorklet 低延迟模式
-                workletBufferSize: 128,     // 低延迟目标 (2.9ms @ 44.1kHz)
-                bufferSize: 2048,           // ScriptProcessor (回退模式)
+                useWorklet: this.config.audio.useWorklet,
+                workletBufferSize: this.config.audio.workletBufferSize || 128,  // 从配置读取
+                bufferSize: this.config.audio.bufferSize,
                 workletFallback: true,      // 自动回退到 ScriptProcessor
-                sampleRate: 44100,
+                sampleRate: this.config.audio.sampleRate,
                 latencyHint: 'interactive',
-                debug: true                 // 启用调试日志
+                debug: this.config.performance.enableStats,
+                // ⚠️ P0 修复: 传递完整配置对象,供 AudioIO 序列化并下发到 Worklet
+                appConfig: this.config
             });
 
             // Phase 2.9: 注册专用 Worklet 回调 (避免与 ScriptProcessor 路径冲突)
@@ -231,7 +265,10 @@ class KazooApp {
 
         // 3. 初始化引擎 (使用实际的 audioContext 和 bufferSize)
         const ctx = this.audioIO.audioContext;
-        const bufferSize = result.mode === 'worklet' ? 128 : 2048;
+        // Phase 2.10: Worklet 使用 workletBufferSize，ScriptProcessor 使用 bufferSize
+        const bufferSize = result.mode === 'worklet'
+            ? (this.config.audio.workletBufferSize || 128)  // 从配置读取，默认 128
+            : this.config.audio.bufferSize;
         await this._initializeEngines(ctx, bufferSize, result.mode);
 
         // 4. 更新性能监控
@@ -307,14 +344,17 @@ class KazooApp {
         // Phase 2.9: ExpressiveFeatures 仅在 ScriptProcessor 模式下初始化
         // Worklet 模式下所有特征提取已在 Worklet 线程完成
         if (mode !== 'worklet' && !this.expressiveFeatures && audioContext && window.ExpressiveFeatures) {
-            console.log('🎨 [Phase 2] Initializing ExpressiveFeatures (ScriptProcessor 模式)...');
+            console.log('🎨 [Phase 2.10] Initializing ExpressiveFeatures (ScriptProcessor 模式) with centralized config...');
             console.log(`  Mode: ${mode}, Buffer: ${bufferSize}, SampleRate: ${audioContext.sampleRate}`);
 
+            // Phase 2.10: 使用集中式配置
             this.expressiveFeatures = new window.ExpressiveFeatures({
-                audioContext: audioContext,  // 传入 audioContext (Phase 2.5 需要)
+                audioContext: audioContext,
                 sampleRate: audioContext.sampleRate,
                 bufferSize: bufferSize,
-                mode: mode
+                mode: mode,
+                // 注入配置参数
+                config: this.config
             });
 
             // Phase 2.5: 注入 sourceNode 启用 AnalyserNode FFT (仅 ScriptProcessor 模式)
@@ -606,8 +646,31 @@ class KazooApp {
     }
 }
 
+// Phase 2.10 P0: 重新初始化合成器引擎 (注入配置 + 乐器预设)
+// ⚠️ 注意: continuousSynthEngine 在 continuous-synth.js 中定义为全局变量
+// 我们需要在这里重新初始化它以注入配置
+if (window.continuousSynthEngine && window.instrumentPresetManager) {
+    console.log('[Main] 🔧 重新初始化 ContinuousSynthEngine (注入配置)...');
+
+    // 清理旧引擎
+    window.continuousSynthEngine.dispose();
+
+    // 创建新引擎 (注入配置和预设)
+    window.continuousSynthEngine = new ContinuousSynthEngine({
+        appConfig: configManager.get(),
+        instrumentPresets: window.instrumentPresetManager.presets
+    });
+
+    console.log('[Main] ✅ ContinuousSynthEngine 已使用集中式配置初始化');
+}
+
 // 创建应用实例并初始化
 const app = new KazooApp();
+
+// Phase 2.10: 暴露到全局作用域 (便于调试和运行时配置调整)
+window.configManager = configManager;
+window.app = app;
+
 document.addEventListener('DOMContentLoaded', () => {
     app.initialize();
 });

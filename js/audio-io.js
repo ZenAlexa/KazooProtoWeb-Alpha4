@@ -375,7 +375,10 @@ class AudioIO {
             to: 'Worklet',
             clarityThreshold: workletConfig.clarityThreshold,
             minFrequency: workletConfig.minFrequency,
-            maxFrequency: workletConfig.maxFrequency
+            maxFrequency: workletConfig.maxFrequency,
+            minVolumeThreshold: workletConfig.minVolumeThreshold,  // 🔍 调试日志
+            energyThreshold: workletConfig.energyThreshold,
+            silenceThreshold: workletConfig.silenceThreshold
         });
 
         return workletConfig;

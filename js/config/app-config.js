@@ -117,11 +117,11 @@ const DEFAULT_CONFIG = {
   // 音高检测配置 (Pitch Detector Configuration)
   // ─────────────────────────────────────────────────────────────────────────
   pitchDetector: {
-    clarityThreshold: 0.15,      // 🔥 紧急修复: 0.85 → 0.15 (iPhone 麦克风置信度低)
+    clarityThreshold: 0.10,      // 🔥 紧急: 0.15 → 0.10 (进一步放宽)
     minFrequency: 50,            // 🔥 修复: 50Hz (G1) - 覆盖男低音 C2(65Hz) + 容差
     maxFrequency: 1500,          // 🔥 修复: 1500Hz (覆盖女高音 + 唱歌高音区)
-    minVolumeThreshold: 0.002,   // 🔥 修复: 0.005 → 0.002 (检测轻声哼唱)
-    minConfidence: 0.05          // 🔥 修复: 合成器最小置信度阈值 (允许低置信度通过)
+    minVolumeThreshold: 0.0005,  // 🔥 紧急: 0.002 → 0.0005 (极限放宽,几乎禁用)
+    minConfidence: 0.01          // 🔥 紧急: 0.05 → 0.01 (极限放宽)
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -187,7 +187,12 @@ const DEFAULT_CONFIG = {
   performance: {
     enableStats: true,           // 启用性能统计
     logLevel: 'info'             // 日志级别: none/error/warn/info/debug
-  }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 配置版本 (Config Version) - 用于缓存破坏
+  // ─────────────────────────────────────────────────────────────────────────
+  version: '1.0.3'  // 🔥 每次修改配置时更新版本号,强制浏览器重新加载
 };
 
 // ============================================================================
@@ -464,10 +469,13 @@ class ConfigManager {
     this._frozen = true;
 
     console.log('[ConfigManager] 配置加载成功');
+    console.log('[ConfigManager] 版本:', this._config.version || 'unknown');  // 🔍 显示版本号
     console.log('[ConfigManager] 预设:', preset || 'default');
     console.log('[ConfigManager] 采样率:', this._config.audio.sampleRate);
     console.log('[ConfigManager] 缓冲区:', this._config.audio.bufferSize);
     console.log('[ConfigManager] Worklet:', this._config.audio.useWorklet);
+    console.log('[ConfigManager] minVolumeThreshold:', this._config.pitchDetector?.minVolumeThreshold);  // 🔍 调试
+    console.log('[ConfigManager] minConfidence:', this._config.pitchDetector?.minConfidence);  // 🔍 调试
 
     return this._config;
   }

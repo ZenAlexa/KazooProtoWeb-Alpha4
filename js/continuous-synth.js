@@ -441,12 +441,14 @@ class ContinuousSynthEngine {
     updateBrightness(brightness) {
         if (brightness === undefined || brightness === null) return;
 
-        // 🔥 新映射算法: 确保滤波器始终高于 2000 Hz
-        // brightness = 0.0 → 2000 Hz (暗但清晰)
-        // brightness = 0.5 → 4243 Hz (中等)
+        // 🔥 紧急修复 2: 进一步提高基线到 3500 Hz
+        // 原因: iPhone 麦克风 brightness 经常为 0,导致 2000 Hz 仍然太闷
+        //
+        // brightness = 0.0 → 3500 Hz (确保清晰度)
+        // brightness = 0.5 → 5793 Hz (明亮)
         // brightness = 1.0 → 8000 Hz (非常亮)
-        const mappedBrightness = Math.pow(brightness, 0.7);  // 指数 0.7 让曲线更平缓
-        const filterFreq = 2000 + mappedBrightness * 6000;
+        const mappedBrightness = Math.pow(brightness, 0.5);  // 指数 0.5 (平方根) 让响应更快
+        const filterFreq = 3500 + mappedBrightness * 4500;
 
         // 平滑过渡 (20ms)
         this.filter.frequency.rampTo(filterFreq, 0.02);

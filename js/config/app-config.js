@@ -117,7 +117,7 @@ const DEFAULT_CONFIG = {
   // 音高检测配置 (Pitch Detector Configuration)
   // ─────────────────────────────────────────────────────────────────────────
   pitchDetector: {
-    clarityThreshold: 0.85,      // YIN 清晰度阈值 (平衡误检/漏检)
+    clarityThreshold: 0.15,      // 🔥 紧急修复: 0.85 → 0.15 (iPhone 麦克风置信度低)
     minFrequency: 50,            // 🔥 修复: 50Hz (G1) - 覆盖男低音 C2(65Hz) + 容差
     maxFrequency: 1500           // 🔥 修复: 1500Hz (覆盖女高音 + 唱歌高音区)
   },

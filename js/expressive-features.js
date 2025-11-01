@@ -91,15 +91,21 @@ export class ExpressiveFeatures {
     this.attackStartTime = 0;
     this.currentAttackTime = 0;
 
-    // 性能监控
+    // 性能监控 (累积统计)
     this.stats = {
       processCount: 0,
       totalProcessTime: 0,
       avgProcessTime: 0,
-      // Phase 2.6: 子模块性能统计
-      smoothingTime: 0,
+      // Phase 2.6: 子模块性能统计 (累积值和平均值)
+      smoothingTime: 0,        // 最后一帧耗时
+      totalSmoothingTime: 0,   // 累积耗时
+      avgSmoothingTime: 0,     // 平均耗时
       onsetTime: 0,
-      spectralTime: 0
+      totalOnsetTime: 0,
+      avgOnsetTime: 0,
+      spectralTime: 0,
+      totalSpectralTime: 0,
+      avgSpectralTime: 0
     };
 
     console.log('[ExpressiveFeatures] 初始化 (Phase 2.6 完整版本)');
@@ -131,14 +137,17 @@ export class ExpressiveFeatures {
     const frame = createPitchFrameFromBasic(pitchInfo, timestamp);
 
     // 2. 计算音量 (使用 AudioUtils)
+    let rawVolumeDb = -60;  // 保存原始音量 (供 OnsetDetector 使用)
     try {
       const rms = AudioUtils.calculateRMS(audioBuffer);
       frame.volumeLinear = rms;
-      frame.volumeDb = AudioUtils.linearToDb(rms);
+      rawVolumeDb = AudioUtils.linearToDb(rms);
+      frame.volumeDb = rawVolumeDb;  // 先存原始值
     } catch (error) {
       // 静音或空缓冲区
       frame.volumeLinear = 0;
       frame.volumeDb = -60;
+      rawVolumeDb = -60;
     }
 
     // 3. 计算音分偏移 (使用 AudioUtils)
@@ -152,11 +161,35 @@ export class ExpressiveFeatures {
       );
     }
 
-    // 4. Phase 2.6: 平滑处理 ✅
+    // 4. Phase 2.6: 起音检测 ✅ (使用原始音量，避免平滑导致峰值钝化)
+    const onsetStart = performance.now();
+    const currentState = this.onsetDetector.update(rawVolumeDb, timestamp);
+    frame.articulation = currentState;
+
+    // 计算 attackTime (从 silence/release 到当前帧的时间)
+    if (currentState === 'attack' && this.lastArticulationState !== 'attack') {
+      // 刚进入 attack 状态
+      this.attackStartTime = timestamp;
+      this.currentAttackTime = 0;
+    } else if (currentState === 'attack' || currentState === 'sustain') {
+      // 在 attack 或 sustain 状态中，持续计算时间
+      this.currentAttackTime = timestamp - this.attackStartTime;
+    }
+    frame.attackTime = this.currentAttackTime;
+    this.lastArticulationState = currentState;
+
+    // 累积 onset 统计
+    this.stats.onsetTime = performance.now() - onsetStart;
+    this.stats.totalOnsetTime += this.stats.onsetTime;
+
+    // 5. Phase 2.6: 平滑处理 ✅ (OnsetDetector 之后再平滑，保证检测灵敏度)
     const smoothStart = performance.now();
     frame.cents = this.smoothingFilters.cents.update(rawCents);
-    frame.volumeDb = this.smoothingFilters.volumeDb.update(frame.volumeDb);
+    frame.volumeDb = this.smoothingFilters.volumeDb.update(rawVolumeDb);  // 平滑原始值
+
+    // 累积 smoothing 统计
     this.stats.smoothingTime = performance.now() - smoothStart;
+    this.stats.totalSmoothingTime += this.stats.smoothingTime;
 
     // 5. Phase 2.6: 频域特征提取 ✅
     const spectralStart = performance.now();
@@ -185,31 +218,18 @@ export class ExpressiveFeatures {
       frame.formant = 1000;
       frame.breathiness = 0.2;
     }
+
+    // 累积 spectral 统计
     this.stats.spectralTime = performance.now() - spectralStart;
+    this.stats.totalSpectralTime += this.stats.spectralTime;
 
-    // 6. Phase 2.6: 起音检测 ✅
-    const onsetStart = performance.now();
-    const currentState = this.onsetDetector.update(frame.volumeDb, timestamp);
-    frame.articulation = currentState;
-
-    // 计算 attackTime (从 silence/release 到当前帧的时间)
-    if (currentState === 'attack' && this.lastArticulationState !== 'attack') {
-      // 刚进入 attack 状态
-      this.attackStartTime = timestamp;
-      this.currentAttackTime = 0;
-    } else if (currentState === 'attack' || currentState === 'sustain') {
-      // 在 attack 或 sustain 状态中，持续计算时间
-      this.currentAttackTime = timestamp - this.attackStartTime;
-    }
-
-    frame.attackTime = this.currentAttackTime;
-    this.lastArticulationState = currentState;
-    this.stats.onsetTime = performance.now() - onsetStart;
-
-    // 7. Phase 2.6: 音高稳定性计算 ✅
-    this.centsHistory.push(rawCents);
-    if (this.centsHistory.length > this.centsHistoryMaxLength) {
-      this.centsHistory.shift();
+    // 6. Phase 2.6: 音高稳定性计算 ✅
+    // 仅在置信度足够时记录 cents 值，避免静音时零值污染
+    if (pitchInfo.frequency > 0 && pitchInfo.confidence > 0.5) {
+      this.centsHistory.push(rawCents);
+      if (this.centsHistory.length > this.centsHistoryMaxLength) {
+        this.centsHistory.shift();
+      }
     }
 
     if (this.centsHistory.length >= 3) {
@@ -218,15 +238,18 @@ export class ExpressiveFeatures {
       // variance 越小，stability 越接近 1
       frame.pitchStability = 1 / (1 + centsVariance);
     } else {
-      // 样本不足，使用默认值
+      // 样本不足，使用默认值 (或低置信度时)
       frame.pitchStability = 0.5;
     }
 
-    // 性能统计
+    // 性能统计 - 计算所有平均值
     const processTime = performance.now() - startTime;
     this.stats.processCount++;
     this.stats.totalProcessTime += processTime;
     this.stats.avgProcessTime = this.stats.totalProcessTime / this.stats.processCount;
+    this.stats.avgSmoothingTime = this.stats.totalSmoothingTime / this.stats.processCount;
+    this.stats.avgOnsetTime = this.stats.totalOnsetTime / this.stats.processCount;
+    this.stats.avgSpectralTime = this.stats.totalSpectralTime / this.stats.processCount;
 
     return frame;
   }

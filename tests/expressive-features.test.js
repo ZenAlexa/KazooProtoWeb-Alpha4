@@ -134,14 +134,21 @@ test('process - 生成完整 PitchFrame (正弦波 440Hz)', () => {
 test('平滑效果 - Kalman Filter 对 cents 的平滑', () => {
   const features = new ExpressiveFeatures({ sampleRate: 44100 });
 
-  // 模拟带噪声的音高检测
+  // 模拟带噪声的音高检测 (使用确定性噪声序列)
   const audioBuffer = generateSineWave(440, 0.05, 44100);
   const centsValues = [];
   const rawCentsValues = [];
 
+  // 确定性噪声序列 (±5 cents，使用正弦波模拟颤音)
+  const noisePattern = [
+    -5, -3, -1, 1, 3, 5, 4, 2, 0, -2,
+    -4, -5, -3, -1, 1, 3, 5, 4, 2, 0
+  ];
+
   for (let i = 0; i < 20; i++) {
-    // 添加随机噪声 (±5 cents)
-    const noisyFreq = 440 * Math.pow(2, (Math.random() * 10 - 5) / 1200);
+    // 使用确定性噪声 (±5 cents)
+    const noiseCents = noisePattern[i];
+    const noisyFreq = 440 * Math.pow(2, noiseCents / 1200);
     const pitchInfo = {
       frequency: noisyFreq,
       confidence: 0.9
@@ -170,7 +177,8 @@ test('平滑效果 - Kalman Filter 对 cents 的平滑', () => {
   console.log(`  方差降低: ${((1 - smoothedVariance / rawVariance) * 100).toFixed(1)}%`);
 
   assert(smoothedVariance < rawVariance, '平滑后方差应该降低');
-  assert(smoothedVariance / rawVariance < 0.7, '方差应降低至少 30%');
+  // 使用确定性数据后，可以更严格地验证性能 (至少降低 50%)
+  assert(smoothedVariance / rawVariance < 0.5, '方差应降低至少 50%');
 
   totalAssertions += 2;
 });

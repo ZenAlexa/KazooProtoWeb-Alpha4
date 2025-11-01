@@ -37,12 +37,15 @@ export class KalmanFilter {
    * @param {Object} config - 配置参数
    * @param {number} [config.Q=0.001] - 过程噪声协方差 (越小越信任模型，响应越慢)
    * @param {number} [config.R=0.1] - 测量噪声协方差 (越小越信任测量，响应越快)
+   * @param {number} [config.processNoise] - 过程噪声 (别名，等价于 Q)
+   * @param {number} [config.measurementNoise] - 测量噪声 (别名，等价于 R)
    * @param {number} [config.initialEstimate=0] - 初始估计值
    * @param {number} [config.initialError=1] - 初始误差协方差
    */
   constructor(config = {}) {
-    this.Q = config.Q ?? 0.001;  // 过程噪声 (Process noise)
-    this.R = config.R ?? 0.1;    // 测量噪声 (Measurement noise)
+    // 支持两种参数名: Q/R (标准) 和 processNoise/measurementNoise (别名)
+    this.Q = config.Q ?? config.processNoise ?? 0.001;  // 过程噪声 (Process noise)
+    this.R = config.R ?? config.measurementNoise ?? 0.1;    // 测量噪声 (Measurement noise)
 
     // 状态变量
     this.x = config.initialEstimate ?? 0;  // 状态估计 (State estimate)

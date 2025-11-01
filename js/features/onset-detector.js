@@ -60,12 +60,14 @@ export class OnsetDetector {
    * @param {OnsetConfig} config - 配置参数
    */
   constructor(config = {}) {
-    // 配置参数
+    // 配置参数 (支持别名)
     this.energyThreshold = config.energyThreshold ?? 6;
     this.timeWindow = config.timeWindow ?? 3;
-    this.minSilenceDuration = config.minSilenceDuration ?? 100;
+    // 支持两种参数名: minSilenceDuration (标准) 和 releaseHoldTime (别名)
+    this.minSilenceDuration = config.minSilenceDuration ?? config.releaseHoldTime ?? 100;
     this.silenceThreshold = config.silenceThreshold ?? -40;
-    this.attackDuration = config.attackDuration ?? 50;
+    // 支持两种参数名: attackDuration (标准) 和 attackHoldTime (别名)
+    this.attackDuration = config.attackDuration ?? config.attackHoldTime ?? 50;
 
     // 内部状态
     this.volumeHistory = [];  // 音量历史缓冲区 (最近 N 帧)

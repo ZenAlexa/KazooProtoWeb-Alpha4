@@ -356,8 +356,8 @@ class AudioIO {
             // 平滑参数 (从 config.smoothing 映射)
             smoothingSize: 5,  // 中值滤波窗口 (固定)
 
-            // 音量阈值
-            minVolumeThreshold: 0.005,  // 🔥 临时降低 (iPhone 麦克风音量小)
+            // 音量阈值 (从集中式配置读取)
+            minVolumeThreshold: config.pitchDetector?.minVolumeThreshold ?? 0.002,  // 🔥 从配置读取
 
             // Phase 2.9: EMA 滤波器参数 (用于 Worklet 内部平滑)
             volumeAlpha: config.smoothing?.volume?.alpha ?? 0.3,

@@ -156,8 +156,8 @@ class ContinuousSynthEngine {
         this.lastUpdateTime = 0;
         this.minUpdateInterval = 10;  // 最小更新间隔 10ms（避免过度触发）
 
-        // 置信度阈值
-        this.minConfidence = 0.1;  // 提高到10%，减少噪音误触发
+        // 置信度阈值 (从集中式配置读取)
+        this.minConfidence = options.appConfig?.pitchDetector?.minConfidence ?? 0.05;  // 🔥 修复: 从配置读取
 
         // 无声检测机制（防止停止哼唱后声音不停）
         this.silenceTimeout = 300;  // 300ms无有效音高则停止

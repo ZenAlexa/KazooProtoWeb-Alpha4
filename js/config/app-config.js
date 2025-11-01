@@ -119,7 +119,9 @@ const DEFAULT_CONFIG = {
   pitchDetector: {
     clarityThreshold: 0.15,      // 🔥 紧急修复: 0.85 → 0.15 (iPhone 麦克风置信度低)
     minFrequency: 50,            // 🔥 修复: 50Hz (G1) - 覆盖男低音 C2(65Hz) + 容差
-    maxFrequency: 1500           // 🔥 修复: 1500Hz (覆盖女高音 + 唱歌高音区)
+    maxFrequency: 1500,          // 🔥 修复: 1500Hz (覆盖女高音 + 唱歌高音区)
+    minVolumeThreshold: 0.002,   // 🔥 修复: 0.005 → 0.002 (检测轻声哼唱)
+    minConfidence: 0.05          // 🔥 修复: 合成器最小置信度阈值 (允许低置信度通过)
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -149,8 +151,8 @@ const DEFAULT_CONFIG = {
   // 起音检测配置 (Onset Detector Configuration)
   // ─────────────────────────────────────────────────────────────────────────
   onset: {
-    energyThreshold: 6,          // 能量阈值 (dB) - 起音灵敏度
-    silenceThreshold: -40,       // 静音阈值 (dB) - 静音判定
+    energyThreshold: 3,          // 🔥 修复: 6 → 3 dB (更敏感,适配低置信度)
+    silenceThreshold: -50,       // 🔥 修复: -40 → -50 dB (允许更轻的声音)
     attackDuration: 50,          // Attack 最短持续时间 (ms) - 防抖
     minSilenceDuration: 100,     // Release→Silence 最短时长 (ms) - 尾音处理
     timeWindow: 3,               // 时间窗口大小 (帧) - 平滑度

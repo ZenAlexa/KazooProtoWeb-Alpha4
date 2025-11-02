@@ -598,6 +598,9 @@ class ContinuousSynthEngine {
                 this.isPlaying = false;
                 this.currentFrequency = 0;
 
+                // 🔥 重置状态机 - 修复停止后无法重启的问题
+                this.lastArticulationState = 'silence';
+
                 // 清除无声检测定时器
                 if (this.silenceCheckInterval) {
                     clearInterval(this.silenceCheckInterval);

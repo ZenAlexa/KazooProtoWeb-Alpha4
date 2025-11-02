@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kazoo Proto - Debug Check</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #00ff00;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #444;
+            background: #2d2d2d;
+        }
+        .pass { color: #00ff00; }
+        .fail { color: #ff0000; }
+        .warn { color: #ffaa00; }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #log {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #000;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Kazoo Proto Debug Checker</h1>
+
+    <div class="section">
+        <h2>System Checks</h2>
+        <div id="system-checks"></div>
+    </div>
+
+    <div class="section">
+        <h2>Audio Test</h2>
+        <button onclick="testMicrophone()">Test Microphone</button>
+        <button onclick="testSynth()">Test Synthesizer (440Hz)</button>
+        <button onclick="testWithLowestThreshold()">Test with Extreme Thresholds</button>
+        <div id="audio-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Live Console</h2>
+        <div id="log"></div>
+    </div>
+
+    <script src="js/lib/tone.js"></script>
+    <script type="module">
+        import configManager from './js/config/app-config.js';
+
+        const log = (msg, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff0000' : type === 'warn' ? '#ffaa00' : '#00ff00';
+            logDiv.innerHTML += `<div style="color:${color}">[${time}] ${msg}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        // System checks
+        const checks = document.getElementById('system-checks');
+
+        // 1. AudioWorklet support
+        const hasWorklet = typeof AudioWorkletNode !== 'undefined';
+        checks.innerHTML += `<div class="${hasWorklet ? 'pass' : 'fail'}">AudioWorklet: ${hasWorklet ? '✓ Supported' : '✗ Not supported'}</div>`;
+
+        // 2. Microphone API
+        const hasMic = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+        checks.innerHTML += `<div class="${hasMic ? 'pass' : 'fail'}">Microphone API: ${hasMic ? '✓ Available' : '✗ Not available'}</div>`;
+
+        // 3. Config load
+        let config;
+        try {
+            config = configManager.load();
+            checks.innerHTML += `<div class="pass">Config: ✓ Loaded</div>`;
+            checks.innerHTML += `<div style="margin-left:20px">clarityThreshold: ${config.pitchDetector.clarityThreshold}</div>`;
+            checks.innerHTML += `<div style="margin-left:20px">minVolumeThreshold: ${config.pitchDetector.minVolumeThreshold}</div>`;
+            checks.innerHTML += `<div style="margin-left:20px">minConfidence: ${config.pitchDetector.minConfidence}</div>`;
+            checks.innerHTML += `<div style="margin-left:20px">frequency range: ${config.pitchDetector.minFrequency}-${config.pitchDetector.maxFrequency} Hz</div>`;
+        } catch (e) {
+            checks.innerHTML += `<div class="fail">Config: ✗ Failed to load - ${e.message}</div>`;
+        }
+
+        // 4. Tone.js
+        checks.innerHTML += `<div class="${window.Tone ? 'pass' : 'fail'}">Tone.js: ${window.Tone ? '✓ Loaded' : '✗ Not loaded'}</div>`;
+
+        // Test functions
+        window.testMicrophone = async () => {
+            log('Testing microphone...', 'info');
+            const statusDiv = document.getElementById('audio-status');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                });
+
+                const audioContext = new AudioContext({ sampleRate: 44100 });
+                const source = audioContext.createMediaStreamSource(stream);
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                const buffer = new Uint8Array(analyser.frequencyBinCount);
+                let frameCount = 0;
+
+                const checkAudio = () => {
+                    analyser.getByteTimeDomainData(buffer);
+
+                    // Calculate RMS
+                    let sum = 0;
+                    for (let i = 0; i < buffer.length; i++) {
+                        const normalized = (buffer[i] - 128) / 128;
+                        sum += normalized * normalized;
+                    }
+                    const rms = Math.sqrt(sum / buffer.length);
+                    const db = 20 * Math.log10(rms);
+
+                    frameCount++;
+                    if (frameCount % 10 === 0) {
+                        log(`Volume: ${rms.toFixed(6)} RMS (${db.toFixed(1)} dB)`, rms > 0.001 ? 'info' : 'warn');
+
+                        statusDiv.innerHTML = `
+                            <div>RMS: ${rms.toFixed(6)}</div>
+                            <div>dB: ${db.toFixed(1)}</div>
+                            <div class="${rms > config.pitchDetector.minVolumeThreshold ? 'pass' : 'fail'}">
+                                Threshold check: ${rms > config.pitchDetector.minVolumeThreshold ? 'PASS' : 'FAIL'}
+                                (need > ${config.pitchDetector.minVolumeThreshold})
+                            </div>
+                        `;
+                    }
+
+                    if (frameCount < 100) {
+                        requestAnimationFrame(checkAudio);
+                    } else {
+                        stream.getTracks().forEach(track => track.stop());
+                        audioContext.close();
+                        log('Microphone test complete', 'info');
+                    }
+                };
+
+                checkAudio();
+
+            } catch (error) {
+                log(`Microphone error: ${error.message}`, 'error');
+                statusDiv.innerHTML = `<div class="fail">✗ ${error.message}</div>`;
+            }
+        };
+
+        window.testSynth = async () => {
+            log('Testing synthesizer at 440Hz (A4)...', 'info');
+
+            try {
+                await Tone.start();
+                log('Tone.js started', 'info');
+
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: {
+                        attack: 0.01,
+                        decay: 0.2,
+                        sustain: 0.8,
+                        release: 0.3
+                    }
+                }).toDestination();
+
+                synth.triggerAttackRelease('A4', '2n');
+                log('Should hear A4 note for 0.5 seconds', 'info');
+
+                setTimeout(() => {
+                    synth.dispose();
+                    log('Synth test complete', 'info');
+                }, 1000);
+
+            } catch (error) {
+                log(`Synth error: ${error.message}`, 'error');
+            }
+        };
+
+        window.testWithLowestThreshold = async () => {
+            log('⚠️ Testing with EXTREME low thresholds...', 'warn');
+
+            // Override config
+            config.pitchDetector.clarityThreshold = 0.01;
+            config.pitchDetector.minVolumeThreshold = 0.00001;
+            config.pitchDetector.minConfidence = 0.001;
+
+            log(`New thresholds:`, 'warn');
+            log(`  clarityThreshold: ${config.pitchDetector.clarityThreshold}`, 'warn');
+            log(`  minVolumeThreshold: ${config.pitchDetector.minVolumeThreshold}`, 'warn');
+            log(`  minConfidence: ${config.pitchDetector.minConfidence}`, 'warn');
+            log('Now go to main app and test!', 'warn');
+        };
+
+        log('Debug checker ready', 'info');
+        log('Click buttons above to run tests', 'info');
+    </script>
+</body>
+</html>

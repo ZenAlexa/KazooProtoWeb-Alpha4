@@ -1,0 +1,118 @@
+========================================
+Latency Profiler - 快速启动指南
+========================================
+
+1. 快速诊断 (无需修改代码)
+   打开浏览器访问:
+   http://localhost:3000/latency-profiler/pages/quick-check.html
+   
+   点击 "Run Full Diagnostic" 按钮
+   
+   查看诊断结果:
+   - ✅ 总延迟 < 20ms: 优秀
+   - ⚠️  总延迟 20-50ms: 可用
+   - ❌ 总延迟 > 50ms: 需要优化
+   
+   关键指标:
+   - Output Latency > 50ms → 可能是蓝牙设备
+   - Buffer Latency > 10ms → 考虑减小缓冲区
+   - Browser: Chrome推荐 (延迟最低)
+
+----------------------------------------
+
+2. 集成到主应用 (完整profiling)
+   
+   Step 1: 在浏览器访问主应用时添加 ?profile 参数
+           http://localhost:3000?profile
+   
+   Step 2: 按照 docs/INTEGRATION.md 修改代码
+           - pitch-worklet.js (注入Worklet时间戳)
+           - audio-io.js (注入消息传输时间戳)
+           - main.js (注入主线程时间戳)
+   
+   Step 3: 启动应用并唱歌
+   
+   Step 4: 10秒后控制台自动打印延迟报告
+   
+   或手动获取报告:
+   > window.latencyProfiler.generateReport()
+   > window.latencyProfiler.printReport()
+
+----------------------------------------
+
+3. 实时监控 (可视化)
+   
+   (需完成步骤2的集成)
+   
+   新标签页打开:
+   http://localhost:3000/latency-profiler/pages/monitor.html
+   
+   观察实时更新的:
+   - 延迟分布直方图
+   - 各段平均延迟柱状图
+   - 详细日志 (最近10帧)
+
+----------------------------------------
+
+4. 诊断180ms延迟问题
+
+   最可能原因排查:
+   
+   A. 蓝牙设备 (概率60%)
+      - 在quick-check.html点击 "Detect Audio Devices"
+      - 如果看到 "Bluetooth" / "AirPods"
+      - 解决: 切换到有线耳机
+      - 预期: 延迟降至20-30ms
+   
+   B. AudioContext配置错误 (概率20%)
+      - 检查 Output Latency 值
+      - 如果 > 50ms → 系统音频设置问题
+      - 解决: 检查系统音频设备配置
+   
+   C. Worklet累积缓冲 (概率15%)
+      - 如果 Buffer Latency > 40ms
+      - 解决: 减小workletBufferSize (需修改配置)
+   
+   D. ScriptProcessor回退 (概率5%)
+      - 检查控制台 "Selected mode" 日志
+      - 如果显示 "script-processor"
+      - 解决: 升级浏览器或检查AudioWorklet支持
+
+----------------------------------------
+
+5. 常用命令 (浏览器控制台)
+
+   # 检查profiler状态
+   window.latencyProfiler
+   
+   # 生成报告
+   window.latencyProfiler.generateReport()
+   
+   # 打印详细报告
+   window.latencyProfiler.printReport()
+   
+   # 查看采集的会话数
+   window.latencyProfiler.completedSessions.length
+   
+   # 查看时钟同步状态
+   window.latencyProfiler.clockSync.offset
+   
+   # 检查AudioContext延迟
+   Tone.context.outputLatency * 1000  // 毫秒
+
+----------------------------------------
+
+6. 文档索引
+
+   README.md              - 工具概述
+   docs/INTEGRATION.md    - 集成指南 (详细步骤)
+   docs/ARCHITECTURE.md   - 架构设计文档
+   js/clock-sync.js       - 时钟同步工具
+   js/latency-profiler.js - 核心Profiler类
+   js/patch-worklet.js    - Worklet补丁指南
+   pages/quick-check.html - 快速诊断页面
+   pages/monitor.html     - 实时监控页面 (TODO)
+
+----------------------------------------
+
+问题反馈: https://github.com/zimingwang/KazooProtoWeb-Alpha4/issues

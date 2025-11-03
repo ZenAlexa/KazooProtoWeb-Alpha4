@@ -464,3 +464,8 @@ if (typeof setInterval !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = LatencyProfiler;
 }
+
+// 浏览器环境下暴露到全局 (确保通过非模块脚本加载时可访问)
+if (typeof window !== 'undefined') {
+    window.LatencyProfiler = LatencyProfiler;
+}

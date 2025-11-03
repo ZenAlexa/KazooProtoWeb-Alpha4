@@ -152,3 +152,8 @@ class ClockSync {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ClockSync;
 }
+
+// 浏览器环境下暴露到全局 (确保 ES Module 可以通过 window 访问)
+if (typeof window !== 'undefined') {
+    window.ClockSync = ClockSync;
+}

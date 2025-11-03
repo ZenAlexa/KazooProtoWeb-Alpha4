@@ -395,6 +395,7 @@
         let histogramBuckets = [];
         let broadcastChannel = null;
         let latencyDataCache = null;  // 缓存从主应用接收的数据
+        let reportStatusMessageVisible = false;
 
         // DOM elements
         const startBtn = document.getElementById('startBtn');
@@ -430,6 +431,10 @@
                 broadcastChannel.onmessage = (event) => {
                     if (event.data.type === 'report') {
                         latencyDataCache = event.data.report;
+                        if (reportStatusMessageVisible) {
+                            showError('');
+                            reportStatusMessageVisible = false;
+                        }
                         console.log('[Monitor] 收到延迟报告:', latencyDataCache);
                     }
                 };
@@ -467,6 +472,7 @@
                         '2. 已点击 "Start Playing" 启动音频系统<br>' +
                         '3. 正在唱歌/哼唱以产生音频数据<br><br>' +
                         '🔄 数据将自动同步到此页面');
+                    reportStatusMessageVisible = true;
                     return 'broadcast';  // 特殊返回值表示使用 BroadcastChannel 模式
                 }
 
@@ -657,6 +663,9 @@
 
                 if (connectionResult === 'broadcast') {
                     console.log('[Monitor] 使用 BroadcastChannel 模式，等待主应用数据...');
+                } else {
+                    showError('');
+                    reportStatusMessageVisible = false;
                 }
             }
         });

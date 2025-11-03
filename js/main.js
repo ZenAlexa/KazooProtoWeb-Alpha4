@@ -206,7 +206,16 @@ class KazooApp {
 
         } catch (error) {
             console.error('Failed to start:', error);
-            alert('Failed to start: ' + error.message + '\n\nPlease check:\n- Microphone permission\n- HTTPS connection\n- Browser compatibility');
+
+            // 显示用户友好的错误提示
+            this._showError(error.message || '启动失败，请检查麦克风权限和浏览器兼容性');
+
+            // 重置 UI 状态
+            this.ui.startBtn.classList.remove('hidden');
+            this.ui.stopBtn.classList.add('hidden');
+            this.ui.recordingStatus.textContent = 'Error';
+            this.ui.recordingStatus.classList.remove('status-ready');
+            this.ui.recordingStatus.classList.add('status-error');
         }
     }
 
@@ -666,6 +675,22 @@ class KazooApp {
             });
 
             ctx.stroke();
+        }
+    }
+
+    /**
+     * 显示用户友好的错误提示
+     * @param {string} message - 错误信息
+     * @private
+     */
+    _showError(message) {
+        // 使用 alert 显示错误（简单直接）
+        alert(`❌ ${message}`);
+
+        // 如果有错误提示框，也在那里显示
+        if (this.ui.warningBox && this.ui.warningText) {
+            this.ui.warningBox.classList.remove('hidden');
+            this.ui.warningText.innerHTML = `<li>${message.replace(/\n/g, '</li><li>')}</li>`;
         }
     }
 }

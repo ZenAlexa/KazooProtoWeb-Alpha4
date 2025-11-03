@@ -417,23 +417,89 @@ class AudioIO {
     /**
      * 请求麦克风权限
      * @private
+     * @throws {Error} 麦克风访问失败时抛出详细错误
      */
     async _requestMicrophone() {
+        // 检查浏览器支持
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('浏览器不支持麦克风访问');
+            throw new Error(
+                '浏览器不支持麦克风访问\n\n' +
+                '请确认:\n' +
+                '• 使用现代浏览器 (Chrome 66+, Firefox 76+, Safari 14.1+)\n' +
+                '• 使用 HTTPS 连接或 localhost 环境'
+            );
         }
 
         console.log('🎤 请求麦克风权限...');
 
-        this.stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false,
-                latency: 0
-            },
-            video: false
-        });
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    latency: 0
+                },
+                video: false
+            });
+        } catch (error) {
+            // 根据错误类型提供友好提示
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                throw new Error(
+                    '麦克风权限被拒绝\n\n' +
+                    '请允许浏览器访问麦克风:\n' +
+                    '• Chrome: 点击地址栏的 🔒 图标 → 网站设置 → 麦克风\n' +
+                    '• Firefox: 点击地址栏的 🔒 图标 → 权限 → 使用麦克风\n' +
+                    '• Safari: Safari 菜单 → 设置 → 网站 → 麦克风'
+                );
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                throw new Error(
+                    '未找到麦克风设备\n\n' +
+                    '请确认:\n' +
+                    '• 麦克风已正确连接\n' +
+                    '• 系统设置中麦克风未被禁用\n' +
+                    '• 麦克风未被其他应用占用'
+                );
+            } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                throw new Error(
+                    '无法读取麦克风数据\n\n' +
+                    '可能原因:\n' +
+                    '• 麦克风正被其他应用使用\n' +
+                    '• 麦克风驱动异常\n' +
+                    '• 请尝试重新连接麦克风或重启浏览器'
+                );
+            } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+                // 降级尝试：使用更宽松的约束
+                console.warn('[AudioIO] 麦克风约束过严，尝试降级配置...');
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true  // 使用默认配置
+                    });
+                    console.log('✅ 使用降级配置成功获取麦克风');
+                } catch (fallbackError) {
+                    throw new Error(
+                        '麦克风不支持所需的音频配置\n\n' +
+                        '您的麦克风可能不支持低延迟模式，请尝试:\n' +
+                        '• 使用其他麦克风\n' +
+                        '• 更新麦克风驱动程序'
+                    );
+                }
+            } else {
+                // 未知错误
+                throw new Error(
+                    `无法访问麦克风: ${error.message}\n\n` +
+                    '请尝试:\n' +
+                    '• 刷新页面重试\n' +
+                    '• 检查浏览器控制台获取详细错误信息\n' +
+                    '• 使用其他浏览器'
+                );
+            }
+        }
+
+        // 检查是否成功获取流
+        if (!this.stream || this.stream.getAudioTracks().length === 0) {
+            throw new Error('获取麦克风流失败：未找到音频轨道');
+        }
 
         // 创建音频源节点
         this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
@@ -495,7 +561,9 @@ class AudioIO {
 
             // Phase 1.7: 触发回退到 ScriptProcessor
             if (this.config.workletFallback !== false) {
-                console.warn('⚠️  回退到 ScriptProcessor 模式');
+                console.warn('⚠️  AudioWorklet 加载失败，自动回退到 ScriptProcessor 模式');
+                console.warn('   原因:', error.message);
+                console.warn('   影响: 延迟可能略高 (~46ms vs ~3ms)');
                 this.mode = 'script-processor';
                 await this._setupScriptProcessor();
             } else {

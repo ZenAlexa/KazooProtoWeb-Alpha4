@@ -9,6 +9,56 @@
  * @date 2025-10-30
  */
 
+// ==================== 浏览器兼容性检查 ====================
+
+/**
+ * 检查浏览器对 Web Audio API 的支持情况
+ * @returns {{isSupported: boolean, issues: string[]}} 检查结果
+ * @example
+ * const {isSupported, issues} = checkBrowserSupport();
+ * if (!isSupported) {
+ *   console.error('浏览器不支持:', issues);
+ * }
+ */
+export function checkBrowserSupport() {
+  const issues = [];
+
+  // 检查 AudioContext
+  if (!window.AudioContext && !window.webkitAudioContext) {
+    issues.push('你的浏览器不支持Web Audio API');
+  }
+
+  // 检查 getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    issues.push('你的浏览器不支持麦克风访问 (需要 HTTPS)');
+  }
+
+  // 检查 AudioWorklet (可选功能，不影响基本使用)
+  const hasWorklet = typeof AudioWorkletNode !== 'undefined';
+  if (!hasWorklet) {
+    issues.push('提示: 浏览器不支持 AudioWorklet，将使用 ScriptProcessor (延迟略高)');
+  }
+
+  // 检查 HTTPS (除了 localhost)
+  const isSecure = window.location.protocol === 'https:' ||
+                   window.location.hostname === 'localhost' ||
+                   window.location.hostname === '127.0.0.1';
+  if (!isSecure) {
+    issues.push('警告: 非 HTTPS 环境可能无法访问麦克风');
+  }
+
+  return {
+    isSupported: issues.length === 0 || (issues.length === 1 && issues[0].startsWith('提示')),
+    issues,
+    features: {
+      audioContext: !!(window.AudioContext || window.webkitAudioContext),
+      getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      audioWorklet: hasWorklet,
+      isSecure
+    }
+  };
+}
+
 // ==================== 音量计算 ====================
 
 /**
@@ -297,6 +347,9 @@ export function clamp(value, min, max) {
 // ==================== 导出 ====================
 
 export default {
+  // 浏览器兼容性
+  checkBrowserSupport,
+
   // 音量
   calculateRMS,
   linearToDb,

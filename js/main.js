@@ -8,6 +8,7 @@
  */
 
 import configManager from './config/app-config.js';
+import { checkBrowserSupport, calculateRMS } from './utils/audio-utils.js';
 
 class KazooApp {
     constructor() {
@@ -16,10 +17,10 @@ class KazooApp {
         // Phase 2.10: 加载应用配置 (默认配置)
         this.config = null;  // 由 initialize() 加载
 
-        // Phase 1: 音频系统选择
-        // Feature Flag: 使用 AudioIO (支持 Worklet) 或 audioInputManager (Legacy)
-        this.useAudioIO = true;  // Phase 1: 启用 AudioIO 抽象层
-        this.audioIO = null;     // AudioIO 实例
+        // Phase 1: 音频系统
+        // AudioIO 是唯一支持的音频系统（AudioWorklet + ScriptProcessor fallback）
+        // Legacy audioInputManager 已弃用，代码保留仅供参考
+        this.audioIO = null;  // AudioIO 实例（唯一音频系统）
 
         // Phase 2: 双引擎模式
         this.useContinuousMode = true;  // Phase 2: 默认使用 Continuous 模式 (Phase 2.7 已验证)
@@ -114,7 +115,7 @@ class KazooApp {
      * 检查浏览器兼容性
      */
     checkCompatibility() {
-        const support = audioInputManager.checkBrowserSupport();
+        const support = checkBrowserSupport();
 
         if (!support.isSupported) {
             this.ui.warningBox.classList.remove('hidden');
@@ -186,12 +187,8 @@ class KazooApp {
         try {
             console.log(`Starting Kazoo Proto in ${this.useContinuousMode ? 'Continuous' : 'Legacy'} mode...`);
 
-            // Phase 1: 选择音频系统
-            if (this.useAudioIO) {
-                await this._startWithAudioIO();
-            } else {
-                await this._startWithLegacyAudio();
-            }
+            // Phase 1: 启动音频系统（仅 AudioIO）
+            await this._startWithAudioIO();
 
             // 更新UI
             this.isRunning = true;
@@ -304,8 +301,11 @@ class KazooApp {
     }
 
     /**
-     * Phase 1: 使用 Legacy audioInputManager 启动
+     * @deprecated Legacy audioInputManager 已弃用
+     * 保留此代码仅供参考，不再使用
+     * AudioIO 已提供完整的 AudioWorklet + ScriptProcessor fallback 支持
      */
+    /*
     async _startWithLegacyAudio() {
         console.log('🔄 [Legacy] 使用 audioInputManager');
 
@@ -336,6 +336,7 @@ class KazooApp {
             );
         }
     }
+    */
 
     /**
      * 初始化合成器引擎和音高检测器
@@ -384,7 +385,7 @@ class KazooApp {
             });
 
             // Phase 2.5: 注入 sourceNode 启用 AnalyserNode FFT (仅 ScriptProcessor 模式)
-            if (this.useAudioIO && this.audioIO && this.audioIO.sourceNode) {
+            if (this.audioIO && this.audioIO.sourceNode) {
                 const success = this.expressiveFeatures.setSourceNode(this.audioIO.sourceNode);
                 if (success) {
                     console.log('✅ [Phase 2.5] AnalyserNode FFT 已启用 (原生加速)');
@@ -401,16 +402,13 @@ class KazooApp {
 
     /**
      * 停止播放
-     * Phase 1: 支持 AudioIO 和 audioInputManager
      */
     stop() {
         this.isRunning = false;
 
-        // Phase 1: 停止音频系统
-        if (this.useAudioIO && this.audioIO) {
+        // 停止音频系统
+        if (this.audioIO) {
             this.audioIO.stop();
-        } else {
-            audioInputManager.stop();
         }
 
         // Phase 2: 停止当前引擎
@@ -508,7 +506,7 @@ class KazooApp {
         // 性能监控开始
         performanceMonitor.startProcessing();
 
-        const volume = audioInputManager.getVolume(audioBuffer);
+        const volume = calculateRMS(audioBuffer);
         const pitchInfo = pitchDetector.detect(audioBuffer, volume);
 
         if (pitchInfo) {

@@ -219,6 +219,14 @@
     <script src="js/lib/tone.js"></script>
     <script src="js/lib/pitchfinder-browser.js"></script>
 
+    <!-- Latency Profiler (可选, 通过 Feature Flag 启用) -->
+    <script>
+        // 启用延迟分析工具 (设为 false 关闭, 无性能损耗)
+        window.__ENABLE_LATENCY_PROFILER__ = true;
+    </script>
+    <script src="latency-profiler/js/clock-sync.js"></script>
+    <script src="latency-profiler/js/latency-profiler.js"></script>
+
     <!-- Phase 1: 音频配置和抽象层 (必须在其他模块之前加载) -->
     <script src="js/audio-config.js"></script>
     <script src="js/audio-io.js"></script>

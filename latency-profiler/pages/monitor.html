@@ -393,6 +393,8 @@
         let pollInterval = null;
         let profiler = null;
         let histogramBuckets = [];
+        let broadcastChannel = null;
+        let latencyDataCache = null;  // 缓存从主应用接收的数据
 
         // DOM elements
         const startBtn = document.getElementById('startBtn');
@@ -421,24 +423,59 @@
             ).join('');
         }
 
+        // 初始化 BroadcastChannel 跨标签页通信
+        function initBroadcastChannel() {
+            if ('BroadcastChannel' in window) {
+                broadcastChannel = new BroadcastChannel('latency-profiler');
+                broadcastChannel.onmessage = (event) => {
+                    if (event.data.type === 'report') {
+                        latencyDataCache = event.data.report;
+                        console.log('[Monitor] 收到延迟报告:', latencyDataCache);
+                    }
+                };
+                console.log('[Monitor] BroadcastChannel 已初始化');
+                return true;
+            }
+            console.warn('[Monitor] 浏览器不支持 BroadcastChannel API');
+            return false;
+        }
+
         // Connect to main window's profiler
         function connectToProfiler() {
             try {
-                // Try to access parent window (if opened from main app)
+                // 方式1: 通过 window.opener 访问 (如果通过 window.open() 打开)
                 if (window.opener && window.opener.latencyProfiler) {
                     profiler = window.opener.latencyProfiler;
                     showError('');
+                    console.log('[Monitor] 已通过 window.opener 连接');
                     return true;
                 }
 
-                // Fallback: try same-window profiler (if monitor.html loaded in same context)
+                // 方式2: 同窗口加载
                 if (window.latencyProfiler) {
                     profiler = window.latencyProfiler;
                     showError('');
+                    console.log('[Monitor] 已通过 window.latencyProfiler 连接');
                     return true;
                 }
 
-                showError('⚠️ 无法连接到 Latency Profiler. 请确保主应用已启用 profiling 并打开此页面.');
+                // 方式3: BroadcastChannel 跨标签页通信 (推荐)
+                if (initBroadcastChannel()) {
+                    showError('✅ 等待主应用数据... <br><br>' +
+                        '📋 请确保：<br>' +
+                        '1. 主应用 <a href="/" target="_blank" style="color: #00ff00">http://localhost:3000</a> 已打开<br>' +
+                        '2. 已点击 "Start Playing" 启动音频系统<br>' +
+                        '3. 正在唱歌/哼唱以产生音频数据<br><br>' +
+                        '🔄 数据将自动同步到此页面');
+                    return 'broadcast';  // 特殊返回值表示使用 BroadcastChannel 模式
+                }
+
+                // 无法连接
+                showError('⚠️ 无法连接到 Latency Profiler. <br><br>' +
+                    '📋 推荐方式：<br>' +
+                    '1. 打开主应用: <a href="/" target="_blank" style="color: #00ff00">http://localhost:3000</a><br>' +
+                    '2. 点击 "Start Playing" 按钮<br>' +
+                    '3. 在主应用控制台执行: <code style="color: #00ff00">window.open("/latency-profiler/pages/monitor")</code>');
                 return false;
             } catch (e) {
                 showError(`❌ 连接错误: ${e.message}`);
@@ -449,7 +486,7 @@
         // Show/hide error message
         function showError(message) {
             if (message) {
-                errorMessage.textContent = message;
+                errorMessage.innerHTML = message;  // 使用 innerHTML 支持 HTML 标签
                 errorMessage.style.display = 'block';
             } else {
                 errorMessage.style.display = 'none';
@@ -576,11 +613,24 @@
 
         // Poll profiler data
         function pollData() {
-            if (!profiler || !monitoring) return;
+            if (!monitoring) return;
 
             try {
-                const report = profiler.generateReport();
-                const completedSessions = profiler.completedSessions || [];
+                let report, completedSessions;
+
+                // 如果有直接 profiler 引用，从 profiler 读取
+                if (profiler) {
+                    report = profiler.generateReport();
+                    completedSessions = profiler.completedSessions || [];
+                }
+                // 否则使用 BroadcastChannel 缓存的数据
+                else if (latencyDataCache) {
+                    report = latencyDataCache;
+                    completedSessions = latencyDataCache.completedSessions || [];
+                } else {
+                    // 没有数据，跳过更新
+                    return;
+                }
 
                 updateStatusBar(report);
                 updateBreakdownBars(report);
@@ -594,7 +644,9 @@
 
         // Event handlers
         startBtn.addEventListener('click', () => {
-            if (connectToProfiler()) {
+            const connectionResult = connectToProfiler();
+            // connectToProfiler 返回 true / 'broadcast' / false
+            if (connectionResult) {
                 monitoring = true;
                 startBtn.disabled = true;
                 pauseBtn.disabled = false;
@@ -602,6 +654,10 @@
                 initHistogram();
                 pollInterval = setInterval(pollData, 500); // 500ms refresh
                 pollData(); // Immediate first poll
+
+                if (connectionResult === 'broadcast') {
+                    console.log('[Monitor] 使用 BroadcastChannel 模式，等待主应用数据...');
+                }
             }
         });
 

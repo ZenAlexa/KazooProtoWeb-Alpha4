@@ -367,7 +367,10 @@ class AudioIO {
             // Phase 2.9: 起音检测参数
             energyThreshold: config.onset?.energyThreshold ?? 3,
             silenceThreshold: config.onset?.silenceThreshold ?? -40,
-            minStateDuration: config.onset?.attackDuration ?? 50
+            minStateDuration: config.onset?.attackDuration ?? 50,
+
+            // Latency Profiler: 延迟分析标志 (Feature Flag)
+            enableProfiling: window.__ENABLE_LATENCY_PROFILER__ || false
         };
 
         console.log('[AudioIO] 📋 配置映射完成:', {

@@ -263,6 +263,32 @@ class KazooApp {
         const result = await this.audioIO.start();
         console.log('🎵 AudioIO 已启动:', result);
 
+        // 2.5 初始化延迟分析器 (如果启用)
+        if (window.__ENABLE_LATENCY_PROFILER__ && window.LatencyProfiler) {
+            const profiler = new window.LatencyProfiler(this.audioIO.audioContext);
+            window.latencyProfiler = profiler;  // 暴露到全局供 monitor.html 访问
+            this.latencyProfiler = profiler;    // 保存实例引用
+
+            // 初始化 BroadcastChannel 向监控页面发送数据
+            if ('BroadcastChannel' in window) {
+                this.profilerBroadcast = new BroadcastChannel('latency-profiler');
+                // 每秒发送一次报告
+                setInterval(() => {
+                    const report = profiler.generateReport();
+                    report.completedSessions = profiler.completedSessions.slice(-20);  // 只发送最近20条
+                    this.profilerBroadcast.postMessage({
+                        type: 'report',
+                        report: report
+                    });
+                }, 1000);
+                console.log('📡 BroadcastChannel 已启动，正在向监控页面发送数据');
+            }
+
+            console.log('⚡ Latency Profiler 已启用');
+            console.log('📊 打开实时监控: http://localhost:3000/latency-profiler/pages/monitor.html');
+            console.log('🔍 控制台输入 latencyProfiler.generateReport() 查看统计数据');
+        }
+
         // 3. 初始化引擎 (使用实际的 audioContext 和 bufferSize)
         const ctx = this.audioIO.audioContext;
         // Phase 2.10: Worklet 使用 workletBufferSize，ScriptProcessor 使用 bufferSize

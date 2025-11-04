@@ -690,5 +690,13 @@ class ContinuousSynthEngine {
     }
 }
 
-// 创建全局单例实例（与旧系统保持一致的接口）
-const continuousSynthEngine = new ContinuousSynthEngine();
+// Phase 3 Step 2 Layer 2: 移除全局实例创建，解决双实例问题
+// 实例现在由 AppContainer 统一管理（注入配置和预设）
+// 旧代码: const continuousSynthEngine = new ContinuousSynthEngine();
+//
+// 这是导致双实例问题的根源：
+// - 模块顶层创建了一个无配置的实例
+// - 容器又创建了另一个带依赖注入的实例
+// - 业务代码使用的是旧的模块级实例，容器实例无人使用
+//
+// 为向后兼容，在 main.js 中通过 window.continuousSynthEngine 暴露容器实例

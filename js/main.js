@@ -13,11 +13,28 @@ import { checkBrowserSupport, calculateRMS } from './utils/audio-utils.js';
 import { AppContainer } from './core/app-container.js';
 
 class KazooApp {
-    constructor() {
+    /**
+     * Phase 3 Step 2: 依赖注入构造函数
+     * @param {Object} services - 注入的服务对象
+     * @param {Object} services.config - 应用配置
+     * @param {Object} services.configManager - 配置管理器
+     * @param {Object} services.pitchDetector - 音高检测器
+     * @param {Object} services.performanceMonitor - 性能监控器
+     * @param {Object} services.synthesizerEngine - Legacy 合成器引擎
+     * @param {Object} services.continuousSynthEngine - Continuous 合成器引擎
+     * @param {Function} services.ExpressiveFeatures - 表现力特征提取类
+     */
+    constructor(services = {}) {
         this.isRunning = false;
 
-        // Phase 2.10: 加载应用配置 (默认配置)
-        this.config = null;  // 由 initialize() 加载
+        // Phase 3 Step 2: 注入的服务 (优先使用注入，回退到全局)
+        this.config = services.config || null;
+        this.configManager = services.configManager || null;
+        this.pitchDetector = services.pitchDetector || null;
+        this.performanceMonitor = services.performanceMonitor || null;
+        this.synthesizerEngine = services.synthesizerEngine || null;
+        this.continuousSynthEngine = services.continuousSynthEngine || null;
+        this.ExpressiveFeatures = services.ExpressiveFeatures || null;
 
         // Phase 1: 音频系统
         // AudioIO 是唯一支持的音频系统（AudioWorklet + ScriptProcessor fallback）
@@ -70,13 +87,20 @@ class KazooApp {
 
     /**
      * 初始化应用
+     * Phase 3 Step 2: 使用注入的 configManager
      */
     async initialize() {
         console.log('Initializing Kazoo App (No-Calibration Version)...');
 
+        // Phase 3 Step 2: 使用注入的 configManager (如未注入则回退到全局)
+        const manager = this.configManager || configManager;
+
         // Phase 2.10: 加载集中式配置
         try {
-            this.config = configManager.load();  // 默认配置
+            // 如果 config 未在构造函数注入，则现在加载
+            if (!this.config) {
+                this.config = manager.load();  // 默认配置
+            }
             console.log('[Config] Loaded default configuration:', {
                 sampleRate: this.config.audio.sampleRate,
                 bufferSize: this.config.audio.bufferSize,
@@ -305,9 +329,10 @@ class KazooApp {
             : this.config.audio.bufferSize;
         await this._initializeEngines(ctx, bufferSize, result.mode);
 
-        // 4. 更新性能监控
-        if (!performanceMonitor.metrics.sampleRate) {
-            await performanceMonitor.initialize(ctx, bufferSize, result.mode);
+        // 4. 更新性能监控 (Phase 3 Step 2: 使用注入的服务)
+        const monitor = this.performanceMonitor || performanceMonitor;
+        if (!monitor.metrics.sampleRate) {
+            await monitor.initialize(ctx, bufferSize, result.mode);
         }
     }
 
@@ -358,12 +383,17 @@ class KazooApp {
      * @param {string} mode - 音频模式 ('worklet' | 'script-processor')
      */
     async _initializeEngines(audioContext, bufferSize = 2048, mode = 'script-processor') {
+        // Phase 3 Step 2: 使用注入的服务 (回退到全局)
+        const continuous = this.continuousSynthEngine || continuousSynthEngine;
+        const legacy = this.synthesizerEngine || synthesizerEngine;
+        const detector = this.pitchDetector || pitchDetector;
+
         // 选择引擎
         if (this.useContinuousMode) {
-            this.currentEngine = continuousSynthEngine;
+            this.currentEngine = continuous;
             console.log('Using Continuous Frequency Engine');
         } else {
-            this.currentEngine = synthesizerEngine;
+            this.currentEngine = legacy;
             console.log('Using Legacy Note-Based Engine');
         }
 
@@ -374,9 +404,9 @@ class KazooApp {
         }
 
         // 初始化音高检测 (ScriptProcessor 模式需要)
-        if (mode !== 'worklet' && audioContext && !pitchDetector.detector) {
+        if (mode !== 'worklet' && audioContext && !detector.detector) {
             console.log('Initializing pitch detector...');
-            pitchDetector.initialize(audioContext.sampleRate);
+            detector.initialize(audioContext.sampleRate);
         }
 
         // Phase 2.9: ExpressiveFeatures 仅在 ScriptProcessor 模式下初始化
@@ -452,8 +482,11 @@ class KazooApp {
     onPitchDetected(pitchInfo) {
         if (!this.isRunning || !this.currentEngine) return;
 
+        // Phase 3 Step 2: 使用注入的服务
+        const monitor = this.performanceMonitor || performanceMonitor;
+
         // 性能监控开始
-        performanceMonitor.startProcessing();
+        monitor.startProcessing();
 
         // Phase 2: 生成 PitchFrame
         // ⚠️ 警告: AudioWorklet 模式下没有 audioBuffer，表现力特征不完整
@@ -491,11 +524,11 @@ class KazooApp {
         this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
-        performanceMonitor.endProcessing();
+        monitor.endProcessing();
 
         // 更新性能指标
-        performanceMonitor.updateFPS();
-        const metrics = performanceMonitor.getMetrics();
+        monitor.updateFPS();
+        const metrics = monitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
@@ -514,11 +547,15 @@ class KazooApp {
             return;
         }
 
+        // Phase 3 Step 2: 使用注入的服务
+        const monitor = this.performanceMonitor || performanceMonitor;
+        const detector = this.pitchDetector || pitchDetector;
+
         // 性能监控开始
-        performanceMonitor.startProcessing();
+        monitor.startProcessing();
 
         const volume = calculateRMS(audioBuffer);
-        const pitchInfo = pitchDetector.detect(audioBuffer, volume);
+        const pitchInfo = detector.detect(audioBuffer, volume);
 
         if (pitchInfo) {
             // Phase 2: 生成完整 PitchFrame (包含表现力特征)
@@ -553,11 +590,11 @@ class KazooApp {
         }
 
         // 性能监控结束
-        performanceMonitor.endProcessing();
+        monitor.endProcessing();
 
         // 更新性能指标
-        performanceMonitor.updateFPS();
-        const metrics = performanceMonitor.getMetrics();
+        monitor.updateFPS();
+        const metrics = monitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
@@ -573,6 +610,9 @@ class KazooApp {
     handleWorkletPitchFrame(pitchFrame, timestamp) {
         if (!this.isRunning || !this.currentEngine) return;
 
+        // Phase 3 Step 2: 使用注入的服务
+        const monitor = this.performanceMonitor || performanceMonitor;
+
         // Phase 2.9 调试: 首次调用时打印完整 PitchFrame
         if (!this._workletPitchFrameLogged) {
             console.log('[Main] 🎯 handleWorkletPitchFrame 首次调用:', {
@@ -585,7 +625,7 @@ class KazooApp {
         }
 
         // 性能监控开始
-        performanceMonitor.startProcessing();
+        monitor.startProcessing();
 
         // 更新 UI 显示
         this.ui.currentNote.textContent = `${pitchFrame.note}${pitchFrame.octave}`;
@@ -604,11 +644,11 @@ class KazooApp {
         this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
-        performanceMonitor.endProcessing();
-        performanceMonitor.updateFPS();
+        monitor.endProcessing();
+        monitor.updateFPS();
 
         // 更新延迟显示
-        const metrics = performanceMonitor.getMetrics();
+        const metrics = monitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
@@ -732,49 +772,70 @@ container.register('ExpressiveFeatures', () => window.ExpressiveFeatures, {
     singleton: true
 });
 
-// 5. 音高检测器 (全局单例)
-container.register('pitchDetector', () => pitchDetector, {
+// 5. 音高检测器 (Phase 3 Step 2 Layer 2: 容器创建新实例)
+container.register('pitchDetector', () => {
+    console.log('[Container] 🔧 创建 PitchDetector 实例...');
+    return new PitchDetector();
+}, {
     singleton: true
 });
 
-// 6. 性能监控器 (全局单例)
-container.register('performanceMonitor', () => performanceMonitor, {
+// 6. 性能监控器 (Phase 3 Step 2 Layer 2: 容器创建新实例)
+container.register('performanceMonitor', () => {
+    console.log('[Container] 🔧 创建 PerformanceMonitor 实例...');
+    return new PerformanceMonitor();
+}, {
     singleton: true
 });
 
-// 7. 合成器引擎 - Legacy (全局单例)
-container.register('synthesizerEngine', () => synthesizerEngine, {
+// 7. 合成器引擎 - Legacy (Phase 3 Step 2 Layer 2: 容器创建新实例)
+container.register('synthesizerEngine', () => {
+    console.log('[Container] 🔧 创建 SynthesizerEngine (Legacy) 实例...');
+    return new SynthesizerEngine();
+}, {
     singleton: true
 });
 
-// 8. 合成器引擎 - Continuous (依赖配置和乐器预设)
+// 8. 合成器引擎 - Continuous (Phase 3 Step 2 Layer 2: 真正落实依赖注入)
+// 注意：旧代码在模块顶层创建了无配置实例，导致双实例问题
+// 现在模块文件已移除全局实例创建，容器成为唯一实例来源
 container.register('continuousSynthEngine', (c) => {
     console.log('[Container] 🔧 创建 ContinuousSynthEngine (依赖注入)...');
 
-    // 如果全局已存在，先清理
-    if (window.continuousSynthEngine) {
-        window.continuousSynthEngine.dispose();
-    }
-
-    // 创建新引擎 (注入配置和预设)
+    // Phase 3 Step 2 Layer 2: 容器统一创建实例 (注入配置和预设)
     const engine = new ContinuousSynthEngine({
         appConfig: c.get('config'),
         instrumentPresets: c.get('instrumentPresetManager').presets
     });
 
-    console.log('[Container] ✅ ContinuousSynthEngine 已使用依赖注入创建');
+    console.log('[Container] ✅ ContinuousSynthEngine 已创建 (双实例问题已解决)');
     return engine;
 }, {
     singleton: true,
     dependencies: ['config', 'instrumentPresetManager']
 });
 
-// 9. 主应用实例 (依赖容器中的所有服务)
-container.register('app', () => {
-    console.log('[Container] 🚀 创建 KazooApp 实例...');
-    return new KazooApp();
+// 9. 主应用实例 (Phase 3 Step 2: 传入服务对象，实现依赖注入)
+container.register('app', (c) => {
+    console.log('[Container] 🚀 创建 KazooApp 实例 (依赖注入)...');
+
+    // 收集所有依赖服务
+    const services = {
+        config: c.get('config'),
+        configManager: c.get('configManager'),
+        pitchDetector: c.get('pitchDetector'),
+        performanceMonitor: c.get('performanceMonitor'),
+        synthesizerEngine: c.get('synthesizerEngine'),
+        continuousSynthEngine: c.get('continuousSynthEngine'),
+        ExpressiveFeatures: c.get('ExpressiveFeatures')
+    };
+
+    console.log('[Container] ✅ 服务已注入:', Object.keys(services));
+    return new KazooApp(services);
 }, {
-    singleton: true
+    singleton: true,
+    dependencies: ['config', 'configManager', 'pitchDetector', 'performanceMonitor',
+                   'synthesizerEngine', 'continuousSynthEngine', 'ExpressiveFeatures']
 });
 
 // =============================================================================

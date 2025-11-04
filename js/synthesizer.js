@@ -638,5 +638,8 @@ class SynthesizerEngine {
     }
 }
 
-// 导出单例实例
-const synthesizerEngine = new SynthesizerEngine();
+// Phase 3 Step 2 Layer 2: 移除全局实例创建
+// 实例现在由 AppContainer 统一管理
+// 旧代码: const synthesizerEngine = new SynthesizerEngine();
+//
+// 为向后兼容，在 main.js 中通过 window.synthesizerEngine 暴露容器实例

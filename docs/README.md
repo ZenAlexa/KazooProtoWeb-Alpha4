@@ -1,177 +1,222 @@
-# 项目文档目录
+# 📚 项目文档索引
 
-本目录包含 KazooProtoWeb-Alpha4 项目的所有文档。
+欢迎来到 **KazooProtoWeb-Alpha4** 项目文档中心。
+
+本目录包含项目的完整文档,按类型和阶段组织,便于快速查找和理解项目。
+
+---
+
+## 🚀 快速开始
+
+| 我想... | 查看文档 |
+|---------|---------|
+| **了解项目当前状态** | [PROJECT_STATUS.md](../PROJECT_STATUS.md) (根目录) |
+| **运行和测试项目** | [guides/troubleshooting.md](guides/troubleshooting.md) |
+| **配置音频系统** | [guides/configuration.md](guides/configuration.md) |
+| **查看代码质量** | [analysis/code-quality-summary.txt](analysis/code-quality-summary.txt) |
+| **了解重构进度** | [refactoring/progress.md](refactoring/progress.md) |
+| **编写测试** | [testing/vitest-usage.md](testing/vitest-usage.md) |
+
+---
 
 ## 📁 目录结构
 
 ```
 docs/
-├── README.md                    # 本文件 - 文档导航
-├── analysis/                    # 代码分析报告
-│   ├── code-quality-analysis.md        # 初始代码质量评估
-│   └── code-quality-summary.txt        # 质量摘要
-├── refactoring/                 # 重构文档
-│   ├── plan.md                         # 重构总体计划
-│   ├── progress.md                     # 重构进度追踪
-│   ├── step1/                          # 第一步：清理和规范化
-│   │   └── summary.md
-│   ├── step2/                          # 第二步：架构优化
-│   │   ├── summary.md
-│   │   └── complete.md
-│   └── step3/                          # 第三步：模块化重构
-│       └── stage1-summary.md
-├── testing/                     # 测试相关文档
-│   ├── test-guide.md                   # 测试指南
-│   ├── test-results.md                 # 测试结果
-│   ├── test-scriptprocessor.md         # ScriptProcessor 测试
-│   └── vitest-usage.md                 # Vitest 使用指南
-└── guides/                      # 使用指南
-    └── (待添加)
+├── README.md                           # 本文件 - 文档导航中心
+│
+├── 📊 analysis/                        # 代码质量分析
+│   ├── code-quality-analysis.md       # 详细分析报告 (1011行)
+│   ├── code-quality-summary.txt       # 执行摘要 (252行)
+│   └── code-quality-quickref.txt      # 快速参考 (178行)
+│
+├── 🔧 refactoring/                     # 重构文档
+│   ├── plan.md                        # 三步重构计划 (时间表+风险评估)
+│   ├── progress.md                    # 实时进度追踪 ⭐ 常看
+│   │
+│   ├── step1/                         # 第一步：清理和规范化
+│   │   └── (已完成,无独立文档)
+│   │
+│   ├── step2/                         # 第二步：架构优化
+│   │   ├── summary.md                # 第二步总结
+│   │   └── complete.md               # 完成报告 (详细)
+│   │
+│   └── step3/                         # 第三步：模块化重构 (进行中)
+│       └── stage1-summary.md         # 阶段1总结 (依赖注入+测试)
+│
+├── 🧪 testing/                         # 测试相关
+│   ├── vitest-usage.md                # Vitest 使用指南 ⭐ 必读
+│   ├── test-guide.md                  # 第二步测试指南
+│   ├── test-results.md                # 测试结果报告
+│   └── test-scriptprocessor.md        # ScriptProcessor 专项测试
+│
+├── 📚 guides/                          # 用户和开发指南
+│   ├── configuration.md               # 音频系统配置说明
+│   ├── configuration-examples.md      # 配置示例 (预设/自定义)
+│   └── troubleshooting.md             # 常见问题排查
+│
+├── 📦 archive/                         # 历史文档归档
+│   ├── fixes/                         # 历史修复记录
+│   ├── planning/                      # 历史规划文档
+│   └── (phase1/, phase2/ 在根级别)
+│
+├── phase1/                            # Phase 1 文档 (完成)
+├── phase2/                            # Phase 2 文档 (完成)
+└── roadmap/                           # 长期路线图
 ```
 
-## 📚 文档分类
+---
 
-### 1. 代码分析 (`analysis/`)
+## 📖 文档分类详解
 
-包含项目初始状态的代码质量分析报告。
+### 1. 📊 代码质量分析 (`analysis/`)
 
-- **code-quality-analysis.md**: 详细的代码质量评估 (1011行)
-  - 问题清单 (按严重性排序)
-  - 代码异味识别
-  - 改进建议
+**目的**: 评估项目初始状态,识别问题,制定改进计划
 
-- **code-quality-summary.txt**: 执行摘要 (252行)
-  - 关键问题总结
-  - 优先级排序
+| 文档 | 内容 | 适合 |
+|------|------|------|
+| [code-quality-summary.txt](analysis/code-quality-summary.txt) | 执行摘要,关键问题 | ⭐ 快速了解 |
+| [code-quality-analysis.md](analysis/code-quality-analysis.md) | 详细分析 (1011行) | 深入研究 |
+| [code-quality-quickref.txt](analysis/code-quality-quickref.txt) | 快速参考卡 | 查阅指标 |
 
-**阅读顺序**: summary.txt → analysis.md
+**评分**: 初始 3/10 → 当前 5.5/10 → 目标 7/10
 
 ---
 
-### 2. 重构文档 (`refactoring/`)
+### 2. 🔧 重构文档 (`refactoring/`)
 
-记录重构过程的规划、进度和总结。
+**目的**: 记录重构计划、进度和总结
 
 #### 总体文档
-- **plan.md**: 三步重构计划
-  - 时间表 (9-12天)
-  - 风险评估
-  - 验证清单
 
-- **progress.md**: 实时进度追踪
-  - 当前状态
-  - 已完成任务
-  - 下一步计划
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [plan.md](refactoring/plan.md) | 三步重构计划 | 📋 规划 |
+| [progress.md](refactoring/progress.md) | 实时进度追踪 | ⭐ 常更新 |
 
-#### 第一步：清理和规范化 (`step1/`)
-- **summary.md**: 第一步总结
-  - 删除冗余代码
-  - 统一版本号
-  - 建立基础设施
+#### 各步骤文档
 
-#### 第二步：架构优化 (`step2/`)
-- **summary.md**: 第二步总结
-  - 统一音频系统
-  - 错误处理改进
+**第一步: 清理和规范化** (✅ 已完成)
+- 删除冗余代码
+- 统一版本号 (0.4.0)
+- 建立基础设施
 
-- **complete.md**: 第二步完成报告
-  - 详细变更记录
-  - 技术亮点
-  - 测试结果
+**第二步: 架构优化** ([step2/](refactoring/step2/))
+- ✅ 统一音频系统
+- ✅ 错误处理改进
+- ✅ 修复 ScriptProcessor
 
-#### 第三步：模块化重构 (`step3/`)
-- **stage1-summary.md**: 阶段1总结
-  - AppContainer (依赖注入)
-  - UIManager (UI管理)
-  - Vitest (测试框架)
-
-**阅读顺序**: plan.md → progress.md → step*/*.md
+**第三步: 模块化重构** ([step3/](refactoring/step3/)) ⏳ 进行中
+- ✅ 阶段1: 基础设施 (AppContainer, UIManager, Vitest)
+- ⏳ 阶段2: 迁移全局变量
+- ⏳ 阶段3: ES6模块化
+- ⏳ 阶段4: 单元测试 (目标40%)
 
 ---
 
-### 3. 测试文档 (`testing/`)
+### 3. 🧪 测试文档 (`testing/`)
 
-包含测试指南、结果和工具使用说明。
+**目的**: 测试指南、结果和工具使用
 
-- **test-guide.md**: 第二步重构测试指南
-  - 5个测试场景
-  - 详细步骤
-  - 预期结果
+| 文档 | 内容 | 适合 |
+|------|------|------|
+| [vitest-usage.md](testing/vitest-usage.md) | Vitest 使用指南 | ⭐ 必读 |
+| [test-guide.md](testing/test-guide.md) | 第二步测试指南 | 功能测试 |
+| [test-results.md](testing/test-results.md) | 测试结果报告 | 查看结果 |
+| [test-scriptprocessor.md](testing/test-scriptprocessor.md) | ScriptProcessor 测试 | 降级测试 |
 
-- **test-results.md**: 测试结果报告
-  - Worklet 模式测试
-  - ScriptProcessor 测试
-  - 性能指标
-
-- **test-scriptprocessor.md**: ScriptProcessor 专项测试
-  - 修复验证
-  - 技术原理
-
-- **vitest-usage.md**: Vitest 使用指南
-  - 命令参考
-  - 编写测试
-  - 故障排查
-
-**阅读顺序**: test-guide.md → test-results.md → vitest-usage.md
+**测试命令**:
+```bash
+npm test              # 运行所有测试
+npm run test:watch    # 监视模式
+npm run test:ui       # 可视化界面
+npm run test:coverage # 覆盖率报告
+```
 
 ---
 
-### 4. 使用指南 (`guides/`)
+### 4. 📚 用户和开发指南 (`guides/`)
 
-(待添加用户文档和开发指南)
+**目的**: 配置、使用和故障排查指南
 
----
-
-## 🔍 快速查找
-
-### 我想了解...
-
-- **项目当前状态** → `PROJECT_STATUS.md` (根目录)
-- **代码质量如何** → `analysis/code-quality-summary.txt`
-- **重构计划** → `refactoring/plan.md`
-- **重构进度** → `refactoring/progress.md`
-- **如何测试** → `testing/vitest-usage.md`
-- **第X步做了什么** → `refactoring/stepX/`
-
-### 我想做...
-
-- **运行测试** → 查看 `testing/vitest-usage.md`
-- **理解架构** → 查看 `refactoring/step3/stage1-summary.md`
-- **修复Bug** → 查看 `analysis/code-quality-analysis.md`
-- **继续重构** → 查看 `refactoring/progress.md`
+| 文档 | 内容 | 适合 |
+|------|------|------|
+| [configuration.md](guides/configuration.md) | 音频系统配置说明 | 配置调优 |
+| [configuration-examples.md](guides/configuration-examples.md) | 配置示例集 | 快速配置 |
+| [troubleshooting.md](guides/troubleshooting.md) | 常见问题排查 | 遇到问题 |
 
 ---
 
-## 📊 文档统计
+### 5. 📦 历史文档归档 (`archive/`)
 
-| 类型 | 数量 | 总行数 |
-|------|------|--------|
-| 分析报告 | 2 | ~1,300 |
-| 重构文档 | 6 | ~2,000 |
-| 测试文档 | 4 | ~800 |
-| 使用指南 | 0 | 0 |
-| **总计** | **12** | **~4,100** |
+**目的**: 保留历史文档,保持主文档整洁
+
+- `fixes/` - 历史修复记录
+- `planning/` - 历史规划文档
+- Phase1, Phase2 文档保留在原位置
 
 ---
 
-## 🔄 文档维护
+## 🔍 常见问题快速查找
 
-### 命名规范
+### 开发相关
 
-- **文件名**: 小写字母 + 连字符 (kebab-case)
-  - ✅ `code-quality-analysis.md`
-  - ❌ `CodeQualityAnalysis.md`
+**Q: 如何开始开发?**
+→ 根目录 [README.md](../README.md) "Quick Start"
 
-- **目录名**: 小写字母 + 下划线 (snake_case)
-  - ✅ `refactoring/step1/`
-  - ❌ `refactoring/Step1/`
+**Q: 项目当前状态如何?**
+→ [PROJECT_STATUS.md](../PROJECT_STATUS.md) (根目录)
+
+**Q: 代码质量怎么样?**
+→ [analysis/code-quality-summary.txt](analysis/code-quality-summary.txt)
+
+**Q: 重构到哪一步了?**
+→ [refactoring/progress.md](refactoring/progress.md)
+
+### 配置相关
+
+**Q: 如何配置音频系统?**
+→ [guides/configuration.md](guides/configuration.md)
+
+**Q: 有哪些配置示例?**
+→ [guides/configuration-examples.md](guides/configuration-examples.md)
+
+**Q: 配置不生效怎么办?**
+→ [guides/troubleshooting.md](guides/troubleshooting.md)
+
+### 测试相关
+
+**Q: 如何运行测试?**
+→ [testing/vitest-usage.md](testing/vitest-usage.md)
+
+**Q: 测试结果在哪?**
+→ [testing/test-results.md](testing/test-results.md)
+
+**Q: 如何编写新测试?**
+→ [testing/vitest-usage.md](testing/vitest-usage.md) "编写测试"
+
+---
+
+## 🔄 文档维护规范
+
+### 命名规则
+
+**文件名**:
+- ✅ 使用 **kebab-case**: `code-quality-analysis.md`
+- ❌ 避免 PascalCase: `CodeQualityAnalysis.md`
+
+**目录名**:
+- ✅ 使用小写: `refactoring/step2/`
+- ✅ 复数形式: `guides/`, `tests/`
 
 ### 更新规则
 
-1. **新文档**: 添加到对应目录
-2. **更新文档**: 修改后更新"最后更新"时间
-3. **归档文档**: 移动到 `archive/` (如需要)
+1. **新增文档**: 放到合适目录 + 更新本 README
+2. **修改文档**: 更新 "最后更新" 时间
+3. **归档文档**: 移至 `archive/`
 
 ---
 
-**最后更新**: 2025-11-04 15:10 CST
+**最后更新**: 2025-11-04 15:30 CST
+**文档版本**: v2.0 (重构第三步)
+**维护者**: Ziming Wang & Claude

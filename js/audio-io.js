@@ -688,12 +688,17 @@ class AudioIO {
         };
 
         // 连接节点链路
-        // Phase 2.10: 仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
+        // Phase 2.10: ScriptProcessor 需要连接到 destination 才能触发 onaudioprocess 回调
+        // 使用静音的 GainNode 避免直接回放麦克风输入（防止回声）
         // 合成器会单独连接到 destination 输出音色
-        this.sourceNode.connect(this.processorNode);
-        // REMOVED: this.processorNode.connect(this.audioContext.destination);
+        const silentGain = this.audioContext.createGain();
+        silentGain.gain.value = 0;  // 静音（不播放麦克风输入）
 
-        console.log('✅ ScriptProcessor 链路已建立 (分析用，不直接播放)');
+        this.sourceNode.connect(this.processorNode);
+        this.processorNode.connect(silentGain);
+        silentGain.connect(this.audioContext.destination);
+
+        console.log('✅ ScriptProcessor 链路已建立 (静音连接，仅用于触发回调)');
     }
 
     /**

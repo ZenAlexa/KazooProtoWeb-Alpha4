@@ -379,3 +379,31 @@ Contributions welcome! Please read the roadmap and Phase 1 completion report bef
 ---
 
 **Enjoy transforming your voice into music!** 🎤🎵✨
+
+---
+
+## 📚 Documentation
+
+Comprehensive documentation is organized in the `/docs` directory:
+
+### Quick Links
+- **📖 [Documentation Index](docs/README.md)** - Complete documentation navigation
+- **📊 [Project Status](PROJECT_STATUS.md)** - Current development status
+- **🔍 [Code Quality Analysis](docs/analysis/code-quality-summary.txt)** - Quality assessment
+- **🔧 [Refactoring Plan](docs/refactoring/plan.md)** - Three-step improvement plan
+- **🧪 [Testing Guide](docs/testing/vitest-usage.md)** - How to test
+
+### Documentation Structure
+```
+docs/
+├── analysis/        # Code quality analysis
+├── refactoring/     # Refactoring documentation
+│   ├── step1/      # Cleanup & standardization
+│   ├── step2/      # Architecture optimization
+│   └── step3/      # Modularization refactoring
+├── testing/         # Test guides and results
+└── guides/          # User and developer guides
+```
+
+For detailed navigation, see **[docs/README.md](docs/README.md)**.
+

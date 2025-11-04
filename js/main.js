@@ -5,10 +5,12 @@
  * Phase 1: 集成 AudioIO 低延迟音频抽象层
  * Phase 2: 集成 ExpressiveFeatures 表现力特征提取管线
  * Phase 2.10: 集成集中式配置管理系统
+ * Phase 3 Step 2: 迁移全局变量到 AppContainer (依赖注入)
  */
 
 import configManager from './config/app-config.js';
 import { checkBrowserSupport, calculateRMS } from './utils/audio-utils.js';
+import { AppContainer } from './core/app-container.js';
 
 class KazooApp {
     constructor() {
@@ -695,31 +697,124 @@ class KazooApp {
     }
 }
 
-// Phase 2.10 P0: 重新初始化合成器引擎 (注入配置 + 乐器预设)
-// ⚠️ 注意: continuousSynthEngine 在 continuous-synth.js 中定义为全局变量
-// 我们需要在这里重新初始化它以注入配置
-if (window.continuousSynthEngine && window.instrumentPresetManager) {
-    console.log('[Main] 🔧 重新初始化 ContinuousSynthEngine (注入配置)...');
+// =============================================================================
+// Phase 3 Step 2: 依赖注入容器初始化
+// =============================================================================
 
-    // 清理旧引擎
-    window.continuousSynthEngine.dispose();
+/**
+ * 创建并配置依赖注入容器
+ * 注册所有核心服务，实现控制反转 (IoC)
+ */
+const container = new AppContainer();
+container.debug = false;  // 生产模式关闭调试日志
+
+// 1. 配置管理器 (最底层，无依赖)
+container.register('configManager', () => configManager, {
+    singleton: true
+});
+
+// 2. 配置对象 (从 configManager 加载)
+// 注意: 必须先调用 load() 再调用 get()
+container.register('config', (c) => {
+    const manager = c.get('configManager');
+    return manager.load();  // load() 返回配置对象
+}, {
+    singleton: true
+});
+
+// 3. 乐器预设管理器 (独立服务，从全局加载)
+container.register('instrumentPresetManager', () => window.instrumentPresetManager, {
+    singleton: true
+});
+
+// 4. 表现力特征提取模块 (从全局加载)
+container.register('ExpressiveFeatures', () => window.ExpressiveFeatures, {
+    singleton: true
+});
+
+// 5. 音高检测器 (全局单例)
+container.register('pitchDetector', () => pitchDetector, {
+    singleton: true
+});
+
+// 6. 性能监控器 (全局单例)
+container.register('performanceMonitor', () => performanceMonitor, {
+    singleton: true
+});
+
+// 7. 合成器引擎 - Legacy (全局单例)
+container.register('synthesizerEngine', () => synthesizerEngine, {
+    singleton: true
+});
+
+// 8. 合成器引擎 - Continuous (依赖配置和乐器预设)
+container.register('continuousSynthEngine', (c) => {
+    console.log('[Container] 🔧 创建 ContinuousSynthEngine (依赖注入)...');
+
+    // 如果全局已存在，先清理
+    if (window.continuousSynthEngine) {
+        window.continuousSynthEngine.dispose();
+    }
 
     // 创建新引擎 (注入配置和预设)
-    window.continuousSynthEngine = new ContinuousSynthEngine({
-        appConfig: configManager.get(),
-        instrumentPresets: window.instrumentPresetManager.presets
+    const engine = new ContinuousSynthEngine({
+        appConfig: c.get('config'),
+        instrumentPresets: c.get('instrumentPresetManager').presets
     });
 
-    console.log('[Main] ✅ ContinuousSynthEngine 已使用集中式配置初始化');
-}
+    console.log('[Container] ✅ ContinuousSynthEngine 已使用依赖注入创建');
+    return engine;
+}, {
+    singleton: true,
+    dependencies: ['config', 'instrumentPresetManager']
+});
 
-// 创建应用实例并初始化
-const app = new KazooApp();
+// 9. 主应用实例 (依赖容器中的所有服务)
+container.register('app', () => {
+    console.log('[Container] 🚀 创建 KazooApp 实例...');
+    return new KazooApp();
+}, {
+    singleton: true
+});
 
-// Phase 2.10: 暴露到全局作用域 (便于调试和运行时配置调整)
-window.configManager = configManager;
-window.app = app;
+// =============================================================================
+// 双轨制兼容层: 保持全局变量，确保向后兼容
+// =============================================================================
+//
+// 策略说明:
+// - 新代码应通过 container.get('xxx') 获取服务
+// - 旧代码仍可通过 window.xxx 访问
+// - 阶段3将移除这些全局变量
+//
+
+// 立即从容器获取核心服务并暴露到全局
+window.configManager = container.get('configManager');
+window.instrumentPresetManager = container.get('instrumentPresetManager');
+window.pitchDetector = container.get('pitchDetector');
+window.performanceMonitor = container.get('performanceMonitor');
+window.synthesizerEngine = container.get('synthesizerEngine');
+window.continuousSynthEngine = container.get('continuousSynthEngine');
+
+// 应用实例稍后创建 (DOMContentLoaded)
+let app = null;
+
+// 暴露容器到全局 (便于调试和测试)
+window.container = container;
+
+console.log('[Main] ✅ 依赖注入容器初始化完成');
+console.log('[Main] 📦 已注册服务:', container.getServiceNames());
+
+// =============================================================================
+// 应用启动
+// =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 从容器获取应用实例
+    app = container.get('app');
+
+    // 暴露到全局 (兼容性)
+    window.app = app;
+
+    // 初始化应用
     app.initialize();
 });

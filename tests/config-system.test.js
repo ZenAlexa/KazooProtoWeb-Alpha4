@@ -66,8 +66,8 @@ test('默认配置 - 音频引擎', () => {
 
 test('默认配置 - 音高检测', () => {
   assert(DEFAULT_CONFIG.pitchDetector.clarityThreshold === 0.10, '默认清晰度阈值应为 0.10 (已优化)');
-  assert(DEFAULT_CONFIG.pitchDetector.minFrequency === 80, '默认最低频率应为 80');
-  assert(DEFAULT_CONFIG.pitchDetector.maxFrequency === 1000, '默认最高频率应为 1000');
+  assert(DEFAULT_CONFIG.pitchDetector.minFrequency === 50, '默认最低频率应为 50 (覆盖男低音)');
+  assert(DEFAULT_CONFIG.pitchDetector.maxFrequency === 1500, '默认最高频率应为 1500 (覆盖女高音)');
 });
 
 test('默认配置 - 平滑滤波', () => {

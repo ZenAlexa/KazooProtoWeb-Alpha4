@@ -7,9 +7,12 @@
   "scripts": {
     "dev": "npx serve . -p 3000",
     "start": "npx serve . -p 3000",
-    "test": "node tests/run-all-tests.js",
-    "test:report": "node tests/run-all-tests.js --report",
-    "test:watch": "nodemon --watch tests --watch js/features tests/run-all-tests.js",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:legacy": "node tests/run-all-tests.js",
+    "test:legacy:report": "node tests/run-all-tests.js --report",
     "deploy": "vercel --prod"
   },
   "repository": {
@@ -33,7 +36,10 @@
     "tone": "^15.1.22"
   },
   "devDependencies": {
-    "serve": "^14.2.1"
+    "@vitest/ui": "^4.0.6",
+    "happy-dom": "^20.0.10",
+    "serve": "^14.2.1",
+    "vitest": "^4.0.6"
   },
   "engines": {
     "node": ">=14.0.0"

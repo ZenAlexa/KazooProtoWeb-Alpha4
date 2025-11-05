@@ -330,9 +330,8 @@ class KazooApp {
         await this._initializeEngines(ctx, bufferSize, result.mode);
 
         // 4. 更新性能监控 (Phase 3 Step 2: 使用注入的服务)
-        const monitor = this.performanceMonitor || performanceMonitor;
-        if (!monitor.metrics.sampleRate) {
-            await monitor.initialize(ctx, bufferSize, result.mode);
+        if (!this.performanceMonitor.metrics.sampleRate) {
+            await this.performanceMonitor.initialize(ctx, bufferSize, result.mode);
         }
     }
 
@@ -383,17 +382,13 @@ class KazooApp {
      * @param {string} mode - 音频模式 ('worklet' | 'script-processor')
      */
     async _initializeEngines(audioContext, bufferSize = 2048, mode = 'script-processor') {
-        // Phase 3 Step 2: 使用注入的服务 (回退到全局)
-        const continuous = this.continuousSynthEngine || continuousSynthEngine;
-        const legacy = this.synthesizerEngine || synthesizerEngine;
-        const detector = this.pitchDetector || pitchDetector;
-
+        // Phase 3 Step 2: 使用注入的服务（容器保证注入，无需回退）
         // 选择引擎
         if (this.useContinuousMode) {
-            this.currentEngine = continuous;
+            this.currentEngine = this.continuousSynthEngine;
             console.log('Using Continuous Frequency Engine');
         } else {
-            this.currentEngine = legacy;
+            this.currentEngine = this.synthesizerEngine;
             console.log('Using Legacy Note-Based Engine');
         }
 
@@ -404,9 +399,9 @@ class KazooApp {
         }
 
         // 初始化音高检测 (ScriptProcessor 模式需要)
-        if (mode !== 'worklet' && audioContext && !detector.detector) {
+        if (mode !== 'worklet' && audioContext && !this.pitchDetector.detector) {
             console.log('Initializing pitch detector...');
-            detector.initialize(audioContext.sampleRate);
+            this.pitchDetector.initialize(audioContext.sampleRate);
         }
 
         // Phase 2.9: ExpressiveFeatures 仅在 ScriptProcessor 模式下初始化
@@ -482,11 +477,8 @@ class KazooApp {
     onPitchDetected(pitchInfo) {
         if (!this.isRunning || !this.currentEngine) return;
 
-        // Phase 3 Step 2: 使用注入的服务
-        const monitor = this.performanceMonitor || performanceMonitor;
-
         // 性能监控开始
-        monitor.startProcessing();
+        this.performanceMonitor.startProcessing();
 
         // Phase 2: 生成 PitchFrame
         // ⚠️ 警告: AudioWorklet 模式下没有 audioBuffer，表现力特征不完整
@@ -524,11 +516,11 @@ class KazooApp {
         this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
-        monitor.endProcessing();
+        this.performanceMonitor.endProcessing();
 
         // 更新性能指标
-        monitor.updateFPS();
-        const metrics = monitor.getMetrics();
+        this.performanceMonitor.updateFPS();
+        const metrics = this.performanceMonitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
@@ -547,15 +539,11 @@ class KazooApp {
             return;
         }
 
-        // Phase 3 Step 2: 使用注入的服务
-        const monitor = this.performanceMonitor || performanceMonitor;
-        const detector = this.pitchDetector || pitchDetector;
-
         // 性能监控开始
-        monitor.startProcessing();
+        this.performanceMonitor.startProcessing();
 
         const volume = calculateRMS(audioBuffer);
-        const pitchInfo = detector.detect(audioBuffer, volume);
+        const pitchInfo = this.pitchDetector.detect(audioBuffer, volume);
 
         if (pitchInfo) {
             // Phase 2: 生成完整 PitchFrame (包含表现力特征)
@@ -590,11 +578,11 @@ class KazooApp {
         }
 
         // 性能监控结束
-        monitor.endProcessing();
+        this.performanceMonitor.endProcessing();
 
         // 更新性能指标
-        monitor.updateFPS();
-        const metrics = monitor.getMetrics();
+        this.performanceMonitor.updateFPS();
+        const metrics = this.performanceMonitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 
@@ -610,9 +598,6 @@ class KazooApp {
     handleWorkletPitchFrame(pitchFrame, timestamp) {
         if (!this.isRunning || !this.currentEngine) return;
 
-        // Phase 3 Step 2: 使用注入的服务
-        const monitor = this.performanceMonitor || performanceMonitor;
-
         // Phase 2.9 调试: 首次调用时打印完整 PitchFrame
         if (!this._workletPitchFrameLogged) {
             console.log('[Main] 🎯 handleWorkletPitchFrame 首次调用:', {
@@ -625,7 +610,7 @@ class KazooApp {
         }
 
         // 性能监控开始
-        monitor.startProcessing();
+        this.performanceMonitor.startProcessing();
 
         // 更新 UI 显示
         this.ui.currentNote.textContent = `${pitchFrame.note}${pitchFrame.octave}`;
@@ -644,11 +629,11 @@ class KazooApp {
         this.updateVisualizer(pitchFrame);
 
         // 性能监控结束
-        monitor.endProcessing();
-        monitor.updateFPS();
+        this.performanceMonitor.endProcessing();
+        this.performanceMonitor.updateFPS();
 
         // 更新延迟显示
-        const metrics = monitor.getMetrics();
+        const metrics = this.performanceMonitor.getMetrics();
         this.ui.latency.textContent = `${metrics.totalLatency}ms`;
     }
 

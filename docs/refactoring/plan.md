@@ -265,181 +265,47 @@ export function processPitchData(frequency, confidence, contextData) {
 ## 🧩 第三步：模块化重构 (4-5天)
 
 ### 目标
-彻底解决全局变量问题，实现真正的模块化
+以依赖注入为核心消除全局对象，升级为 ES Module 架构，并建立可持续的测试体系。
 
-### 具体任务
+### 阶段拆分
 
-#### 3.1 设计依赖注入架构 (4小时)
-**风险等级：🟢 低** - 设计阶段，不改代码
+#### 3.1 基础设施（✅ 已完成）
+- AppContainer、UIManager、Vitest 基础配置
+- 文档与示例代码已经落地
 
-- [ ] 绘制模块依赖图
-- [ ] 设计 Container/ServiceLocator 模式
-- [ ] 定义接口契约（TypeScript 类型定义）
+#### 3.2 依赖注入落地（进行中）
+**风险等级：🟡 中** — 涉及核心运行路径  
+**任务清单**  
+- [ ] `KazooApp` 改为使用注入的 `pitchDetector`、`performanceMonitor`、`continuousSynthEngine`  
+- [ ] `continuous-synth.js`、`synthesizer.js`、`pitch-detector.js`、`performance.js` 仅导出类或工厂函数，不在模块内创建实例  
+- [ ] 容器注册保持双轨制（实例创建权归容器，仍临时暴露 `window.*`）  
+- [ ] 手动测试确认 Worklet / ScriptProcessor 两条路径都能启动  
 
-**架构设计**：
-```javascript
-// js/core/app-container.js
-export class AppContainer {
-  constructor() {
-    this.services = new Map();
-  }
+#### 3.3 ES Module 入口与打包（计划）
+**风险等级：🟡 中** — 需要调整加载顺序  
+- [ ] `index.html` 改为单一 `<script type="module" src="js/main.js">`  
+- [ ] 拆分旧的 `<script>` 标签，确保依赖通过 `import` 引入  
+- [ ] 评估是否引入 Vite/Rollup 作为临时打包工具（可选）  
+- [ ] 更新开发/部署脚本及文档（`npm start`、测试指令等）  
 
-  register(name, factory) {
-    this.services.set(name, { factory, instance: null });
-  }
+#### 3.4 UI 管理器接入与兼容层收敛（计划）
+**风险等级：🟢 低**  
+- [ ] 将状态徽章、音符显示、错误提示等逻辑迁移到 UIManager  
+- [ ] 发布-订阅事件替换直接 DOM 操作  
+- [ ] 分阶段移除 `window.*` 兼容层（记录每次移除的范围与回滚点）  
 
-  get(name) {
-    const service = this.services.get(name);
-    if (!service.instance) {
-      service.instance = service.factory(this);
-    }
-    return service.instance;
-  }
-}
+#### 3.5 测试覆盖率提升（计划）
+**风险等级：🟢 低**  
+- [ ] 为音频管线、依赖注入容器、UIManager 添加单元测试  
+- [ ] 编写基础集成测试（音频启动、模式切换、错误路径）  
+- [ ] 设置覆盖率门槛：`lines/functions/statements ≥ 40%`、`branches ≥ 30%`  
+- [ ] 在阶段结束前生成一次覆盖率报告并归档至 `docs/testing/`  
 
-// 使用示例
-const container = new AppContainer();
-container.register('audioIO', (c) => new AudioIOManager(c.get('logger')));
-container.register('pitchDetector', (c) => new PitchDetector(c.get('logger')));
-container.register('app', (c) => new App(c.get('audioIO'), c.get('pitchDetector')));
-```
-
-#### 3.2 逐步迁移全局变量 (2天)
-**风险等级：🟡 中** - 需要逐个迁移并测试
-
-**迁移顺序**（从低风险到高风险）：
-1. ✅ `window.ExpressiveFeatures` → 依赖注入
-2. ✅ `window.configManager` → 依赖注入
-3. ✅ `window.pitchDetector` → 依赖注入
-4. ✅ `window.calibrationManager` → 依赖注入
-5. ✅ `window.audioIOManager` → 依赖注入
-6. ✅ `window.app` → 依赖注入
-
-**迁移策略**（双轨制）：
-```javascript
-// 第一阶段：同时保留旧接口和新接口
-class App {
-  constructor(audioIO, pitchDetector) {
-    this.audioIO = audioIO;
-    this.pitchDetector = pitchDetector;
-
-    // 向后兼容：保留全局变量（临时）
-    window.app = this;
-  }
-}
-
-// 第二阶段：逐步移除 window.app 的引用
-// 第三阶段：删除 window.app = this
-```
-
-**每迁移一个模块，立即测试**：
-```bash
-npm start
-# 完整功能测试
-```
-
-#### 3.3 创建统一的 UI 管理器 (1天)
-**风险等级：🟢 低** - 整合现有代码
-
-- [ ] 创建 `js/managers/ui-manager.js`
-- [ ] 整合分散的 UI 更新逻辑
-- [ ] 实现发布-订阅模式（事件驱动）
-
-**示例**：
-```javascript
-// js/managers/ui-manager.js
-export class UIManager {
-  constructor() {
-    this.listeners = new Map();
-  }
-
-  on(event, callback) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
-    }
-    this.listeners.get(event).push(callback);
-  }
-
-  emit(event, data) {
-    const callbacks = this.listeners.get(event) || [];
-    callbacks.forEach(cb => cb(data));
-  }
-
-  updatePitchDisplay(frequency, note, cents) {
-    this.emit('pitch-update', { frequency, note, cents });
-  }
-
-  updateCalibrationProgress(step, progress) {
-    this.emit('calibration-progress', { step, progress });
-  }
-}
-```
-
-#### 3.4 引入 ES6 模块 (1天)
-**风险等级：🟡 中** - 需要更新所有 script 标签
-
-- [ ] 将所有 JS 文件改为 ES6 模块（`export`/`import`）
-- [ ] 更新 `index.html` 中的 `<script type="module">`
-- [ ] 配置模块打包（可选：使用 Vite/Rollup）
-
-**迁移步骤**：
-```html
-<!-- 之前：多个 <script> 标签 -->
-<script src="js/audio-input.js"></script>
-<script src="js/pitch-detector.js"></script>
-<script src="js/app.js"></script>
-
-<!-- 之后：单一入口 -->
-<script type="module" src="js/main.js"></script>
-```
-
-```javascript
-// js/main.js
-import { AppContainer } from './core/app-container.js';
-import { setupServices } from './core/service-setup.js';
-
-const container = new AppContainer();
-setupServices(container);
-
-const app = container.get('app');
-app.initialize();
-```
-
-#### 3.5 添加基本的单元测试 (1天)
-**风险等级：🟢 低** - 新增测试，不改现有代码
-
-- [ ] 配置测试框架（Vitest 推荐）
-- [ ] 为核心模块编写单元测试
-- [ ] 配置 CI/CD 自动测试
-
-**测试示例**：
-```javascript
-// tests/pitch-detector.test.js
-import { describe, it, expect } from 'vitest';
-import { PitchDetector } from '../js/detection/pitch-detector.js';
-
-describe('PitchDetector', () => {
-  it('should detect A4 (440Hz) correctly', () => {
-    const detector = new PitchDetector();
-    const result = detector.detectPitch(generateSineWave(440));
-
-    expect(result.frequency).toBeCloseTo(440, 1);
-    expect(result.note).toBe('A4');
-  });
-
-  it('should return null for noisy input', () => {
-    const detector = new PitchDetector();
-    const result = detector.detectPitch(generateNoise());
-
-    expect(result).toBeNull();
-  });
-});
-```
-
-**测试覆盖目标**：
-- `PitchDetector` - 音高检测核心算法
-- `CalibrationManager` - 校准逻辑
-- `AudioIOManager` - 音频流管理（部分）
+### 验证建议
+1. 每个子任务完成后运行 `npm test` 与手动冒烟测试  
+2. 对关键浏览器兼容性（Chrome + Safari）进行现场验证  
+3. 记录双轨制退场的时间点，保持可回滚策略  
+4. 文档、脚本、测试结果保持同步更新
 
 ---
 
@@ -456,11 +322,11 @@ describe('PitchDetector', () => {
 | 2.2 错误处理 | 🟢 低 | 易 | 逐步添加 |
 | 2.3 重构长函数 | 🟢 低 | 易 | 拆分不改逻辑 |
 | 2.4 消除重复 | 🟡 中 | 中 | 抽取共享代码，双轨测试 |
-| 3.1 设计架构 | 🟢 低 | N/A | 仅设计不改代码 |
-| 3.2 迁移全局变量 | 🟡 中 | 中 | 双轨制，逐个迁移 |
-| 3.3 UI 管理器 | 🟢 低 | 易 | 整合现有代码 |
-| 3.4 ES6 模块 | 🟡 中 | 难 | 一次性迁移，充分测试 |
-| 3.5 单元测试 | 🟢 低 | N/A | 新增不影响现有功能 |
+| 3.1 基础设施 | 🟢 低 | 易 | 已完成，保持文档同步 |
+| 3.2 依赖注入落地 | 🟡 中 | 中 | 双轨制迁移，随时回滚 |
+| 3.3 ES 模块入口 | 🟡 中 | 难 | 调整加载顺序，充分测试 |
+| 3.4 UI 管理器接入 | 🟢 低 | 易 | 事件驱动替换 DOM 操作 |
+| 3.5 覆盖率提升 | 🟢 低 | 易 | 新增测试，不改现有逻辑 |
 
 ---
 

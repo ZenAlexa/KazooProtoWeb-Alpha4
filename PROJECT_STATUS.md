@@ -13,22 +13,21 @@
 **当前状态**: 80% 完成，核心功能已实现，正在进行第三步重构（模块化）
 
 **最新进展 (2025-11-04)**:
-- ✅ **第二步重构完成**: 统一音频系统，移除 Legacy 依赖，完整错误处理
-- ✅ **第三步阶段1完成**: 依赖注入容器 (AppContainer)、UI管理器 (UIManager)、Vitest测试框架
-- ✅ **文档体系重组**: 建立清晰的 docs/ 目录结构，分类管理不同阶段文档
-- ⏳ **进行中**: 第三步阶段2 - 迁移全局变量到依赖注入容器
+- ✅ **第二步重构完成**: 统一音频系统、完善错误处理、Legacy 路径收尾
+- ✅ **第三步阶段1完成**: AppContainer、UIManager、Vitest 基础设施投入使用
+- ✅ **文档体系重组**: docs/ 目录按阶段拆分，测试/指南归档
+- ⏳ **进行中**: 第三步阶段2 —— 将核心服务迁移到依赖注入容器，并保持双轨兼容
 
-**本次重构工作 (Step 3 - Stage 1)**:
-- ✅ 创建 AppContainer (依赖注入容器，306行)
-- ✅ 创建 UIManager (UI管理与事件系统，533行)
-- ✅ 配置 Vitest 测试框架 (happy-dom环境)
-- ✅ 编写单元测试 (19个断言全部通过)
-- ✅ 重组文档结构 (guides/, archive/, testing/ 等)
+**第三步阶段1快照**:
+- AppContainer（306 行）提供服务注册/单例/循环依赖检测
+- UIManager（533 行）实现事件驱动 UI 状态管理
+- Vitest 配置完成（happy-dom、覆盖率阈值、19/19 断言通过）
+- 进阶文档与测试脚本同步更新
 
 **下一步行动**:
-1. **阶段2**: 迁移13个全局变量到 AppContainer (估计2-3小时)
-2. **阶段3**: ES6模块化改造
-3. **阶段4**: 提升测试覆盖率到40%
+1. **阶段2：依赖注入落地** — `KazooApp` 与音频/合成模块改为使用容器实例，继续保留 `window.*` 兼容层直至验证完成
+2. **阶段3：ES Module 入口** — 重构 `index.html` 加载路径，建立单一模块入口并评估打包策略
+3. **阶段4：覆盖率与 UIManager 接入** — 将 UI 更新逻辑迁移到事件系统，并将测试覆盖率提升至 40%+
 
 **技术债务状态**: 正在系统性偿还 - 从"屎山"到良好工程项目的转型中
 
@@ -313,26 +312,25 @@ KazooProtoWeb-Alpha4/
 
 ### 第三步重构 (进行中)
 
-#### 阶段2: 全局变量迁移 (下一步)
-**工作量**: 2-3小时
-
+#### 阶段2: 依赖注入落地 (进行中)
+**工作量**: 2-3 小时  
 **任务清单**:
-1. 在 main.js 中注册13个服务到 AppContainer
-2. 保持全局变量作为兼容层
-3. 验证所有功能正常工作
-4. 更新相关测试
+1. 将 `KazooApp` 内的音高检测、性能监控、合成器引用改为 `this.*` 注入实例  
+2. 调整 `continuous-synth.js`、`synthesizer.js`、`pitch-detector.js`、`performance.js` 为“仅导出类/工厂”，实例交由容器创建  
+3. 保留 `window.*` 兼容层（容器创建后再挂载），记录每次兼容层调整  
+4. 验证 Worklet / ScriptProcessor 模式均可启动，更新测试及文档  
 
-#### 阶段3: ES6模块化 (1-2天)
-1. 移除全局变量兼容层
-2. import/export 改造
-3. 模块依赖梳理
-4. 清理冗余代码
+#### 阶段3: ES Module 入口 (1-2天)
+1. 将 `index.html` 替换为单一 `<script type="module" src="js/main.js">`  
+2. 梳理 import 依赖链，移除旧的 `<script>` 加载顺序  
+3. 评估 Vite/Rollup 打包需求，更新 `npm start`/部署脚本  
+4. 清理已过时的全局变量声明与注释  
 
 #### 阶段4: 测试覆盖提升 (2-3天)
-1. 核心模块单元测试
-2. 集成测试
-3. 覆盖率报告
-4. 持续改进
+1. 为音频管线、依赖注入容器、UIManager 编写单元测试  
+2. 建立基础集成测试，覆盖启动/停止/错误路径  
+3. 生成覆盖率报告（目标 ≥40% lines/functions，≥30% branches）  
+4. 整理测试文档与运行指引
 
 **详见**: [docs/refactoring/plan.md](docs/refactoring/plan.md)
 
@@ -415,52 +413,38 @@ KazooProtoWeb-Alpha4/
 
 ## 九、下一步行动计划
 
-### 立即执行: 阶段2 - 全局变量迁移 (2-3小时)
+### 立即执行: 阶段2 - 依赖注入落地 (2-3小时)
 
 **任务清单**:
-1. **注册服务到 AppContainer** (1小时)
-   ```javascript
-   // js/main.js
-   container.register('config', () => configManager.get());
-   container.register('audioIO', (c) => new AudioIO(c.get('config')));
-   container.register('synthEngine', (c) => new ContinuousSynthEngine({
-     appConfig: c.get('config'),
-     instrumentPresets: c.get('instrumentPresets')
-   }));
-   // ... 其余10个服务
-   ```
-
-2. **保持兼容层** (30分钟)
-   ```javascript
-   // 双轨制: 新代码用容器,旧代码用全局变量
-   window.configManager = container.get('config');
-   window.audioIO = container.get('audioIO');
-   // ...
-   ```
-
-3. **验证测试** (30分钟)
-   - 运行 npm test
-   - 浏览器手动测试
-   - 确认所有功能正常
-
-4. **文档更新** (30分钟)
-   - 更新 PROJECT_STATUS.md
-   - 更新 docs/refactoring/progress.md
-   - 创建阶段2总结
-
-**详见**: [docs/refactoring/plan.md](docs/refactoring/plan.md)
+1. **容器实例接入**  
+   - `KazooApp` 改用 `this.performanceMonitor`、`this.pitchDetector`、`this.continuousSynthEngine`  
+   - `_initializeEngines`、`onAudioProcess`、`handleWorkletPitchFrame` 等路径去除直接全局引用  
+2. **模块导出整理**  
+   - `continuous-synth.js`、`synthesizer.js`、`pitch-detector.js`、`performance.js` 改为仅导出类  
+   - 容器负责 `new` 实例并在需要时暴露 `window.*` 兼容层  
+3. **双轨验证**  
+   - Worklet/ScriptProcessor 启动流程  
+   - 浏览器手动测试 + `npm test` 通过  
+4. **文档同步**  
+   - 更新阶段记录、测试结果与回滚说明  
 
 ---
 
-### 近期计划: 阶段3 - ES6模块化 (1-2天)
+### 近期计划: 阶段3 - ES Module 入口 (1-2天)
 
-**完成阶段2后开始**
+- 单一模块入口 (`type="module"`)  
+- 梳理 import 依赖链，清理旧 `<script>`  
+- 评估 Vite/Rollup 等打包策略  
+- 更新 CLI、部署流程和文档
 
 ---
 
 ### 中期计划: 阶段4 - 测试覆盖 (2-3天)
 
-**完成阶段3后开始**
+- 补充单元测试与集成测试  
+- 覆盖率目标 ≥40%（lines/functions）  
+- 生成覆盖率报告并归档  
+- 将测试指南纳入 docs/testing/
 
 ---
 
@@ -469,7 +453,7 @@ KazooProtoWeb-Alpha4/
 ### 重构风险
 
 #### 低风险
-1. **全局变量迁移**（10%）- 双轨制保证兼容性
+1. **依赖注入落地**（10%）- 双轨制保证兼容性
 2. **测试覆盖不足**（20%）- 可以逐步提升
 
 #### 中风险
@@ -554,8 +538,8 @@ KazooProtoWeb-Alpha4/
 - ✅ 测试框架建立
 
 **进行中**:
-- ⏳ 全局变量迁移 (阶段2)
-- ⏳ ES6模块化 (阶段3)
+- ⏳ 依赖注入落地 (阶段2)
+- ⏳ ES Module 入口 (阶段3)
 - ⏳ 测试覆盖提升 (阶段4)
 
 ### 关键里程碑
@@ -563,8 +547,8 @@ KazooProtoWeb-Alpha4/
 2. ✅ Phase 2.10: 配置管理
 3. ✅ **第二步重构: 架构优化 (完成)**
 4. ✅ **第三步阶段1: 基础设施 (完成)**
-5. ⏳ **第三步阶段2: 全局变量迁移 (下一步)**
-6. ⏳ 第三步阶段3-4: 模块化与测试
+5. ⏳ **第三步阶段2: 依赖注入落地 (进行中)**
+6. ⏳ 第三步阶段3-4: 模块化入口与测试覆盖
 7. ⏳ Beta 测试
 
 ### 重构战略
@@ -579,7 +563,7 @@ KazooProtoWeb-Alpha4/
 ### 当前建议
 **这是一个技术可行且正在系统性改进的项目**。核心功能完整，正通过三步重构策略偿还技术债务，提升代码质量和可维护性。
 
-**行动指令**: 继续执行第三步重构，优先完成阶段2全局变量迁移。代码质量提升后再进行性能优化。
+**行动指令**: 继续执行第三步重构，优先完成阶段2依赖注入落地。代码质量提升后再进行性能优化。
 
 ---
 

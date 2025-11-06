@@ -291,6 +291,10 @@ class KazooApp {
             this.audioIO.onError((type, error) => {
                 console.error('[AudioIO Error]', type, error);
             });
+
+            // Phase 3 Stage2: 将 AudioIO 实例注册到容器供调试访问
+            window.container.register('audioIO', () => this.audioIO, { singleton: true });
+            console.log('[Main] 📦 AudioIO 实例已注册到容器');
         }
 
         // 2. 启动音频系统 (先启动，获取实际 mode 和 bufferSize)

@@ -73,7 +73,7 @@ npm start
 **验证方式**:
 ```javascript
 // 在控制台执行:
-window.configManager.get().pitchDetector
+window.container.get('configManager').get().pitchDetector
 // 应返回: { clarityThreshold: 0.85, minFrequency: 80, maxFrequency: 1000 }
 ```
 
@@ -109,10 +109,10 @@ window.configManager.get().pitchDetector
 
 ```javascript
 // 检查合成器是否使用了配置
-window.continuousSynthEngine.appConfig
+window.container.get('continuousSynthEngine').appConfig
 // 应返回完整的配置对象,包含 synthesizer.noiseGainMax 等
 
-window.continuousSynthEngine.appConfig.synthesizer.noiseGainMax
+window.container.get('continuousSynthEngine').appConfig.synthesizer.noiseGainMax
 // 应返回: 0.3 (默认值)
 ```
 
@@ -190,7 +190,7 @@ window.continuousSynthEngine.appConfig.synthesizer.noiseGainMax
 
 ### 查看完整配置
 ```javascript
-window.configManager.get()
+window.container.get('configManager').get()
 ```
 
 ### 查看 Worklet 当前配置
@@ -202,16 +202,16 @@ window.app.audioIO.processorNode.port.postMessage({ type: 'get-stats', command: 
 
 ### 强制重新加载配置
 ```javascript
-window.configManager.load({}, 'default')
+window.container.get('configManager').load({}, 'default')
 location.reload()
 ```
 
 ### 检查乐器预设
 ```javascript
-window.instrumentPresetManager.list()
+window.container.get('instrumentPresetManager').list()
 // 应返回: ['saxophone', 'violin', 'piano', 'flute', 'guitar', 'synth']
 
-window.instrumentPresetManager.get('saxophone')
+window.container.get('instrumentPresetManager').get('saxophone')
 // 应返回完整的预设对象
 ```
 

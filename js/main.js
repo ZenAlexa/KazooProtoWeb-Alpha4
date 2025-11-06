@@ -824,27 +824,22 @@ container.register('app', (c) => {
 });
 
 // =============================================================================
-// 双轨制兼容层: 保持全局变量，确保向后兼容
+// 全局暴露 (仅保留应用入口和容器调试接口)
 // =============================================================================
+// Stage2 清理完成：移除所有中间服务的全局暴露
+// - 所有服务现在通过 window.container.get('serviceName') 访问
+// - 仅保留 window.app (应用入口) 和 window.container (调试接口)
 //
-// 策略说明:
-// - 新代码应通过 container.get('xxx') 获取服务
-// - 旧代码仍可通过 window.xxx 访问
-// - 阶段3将移除这些全局变量
+// 调试示例:
+//   window.container.get('configManager')
+//   window.container.get('pitchDetector')
+//   window.container.get('performanceMonitor')
 //
-
-// 立即从容器获取核心服务并暴露到全局
-window.configManager = container.get('configManager');
-window.instrumentPresetManager = container.get('instrumentPresetManager');
-window.pitchDetector = container.get('pitchDetector');
-window.performanceMonitor = container.get('performanceMonitor');
-window.synthesizerEngine = container.get('synthesizerEngine');
-window.continuousSynthEngine = container.get('continuousSynthEngine');
 
 // 应用实例稍后创建 (DOMContentLoaded)
 let app = null;
 
-// 暴露容器到全局 (便于调试和测试)
+// 暴露容器到全局 (唯一的服务访问入口)
 window.container = container;
 
 console.log('[Main] ✅ 依赖注入容器初始化完成');

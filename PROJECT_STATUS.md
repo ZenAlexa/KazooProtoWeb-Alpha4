@@ -164,13 +164,13 @@ window.container.getServiceNames()    # List all services
 │   │   └── app-container.test.js  # 19 tests passing
 │   └── config-system.test.js      # Config tests
 ├── docs/
-│   ├── README.md
-│   └── guides/
-│       ├── troubleshooting.md
-│       └── configuration.md
+│   ├── guides/
+│   │   ├── troubleshooting.md
+│   │   └── configuration.md
+│   ├── CLEANUP_PLAN.md      # Optimization roadmap
+│   └── CLEANUP_SUMMARY.md   # What was deleted
 ├── CLAUDE.md                # AI guardrails
-├── CLEANUP_PLAN.md          # Optimization roadmap
-├── CLEANUP_SUMMARY.md       # What was deleted
+├── PROJECT_STATUS.md        # This file
 └── README.md                # User guide
 ```
 
@@ -189,8 +189,8 @@ window.container.getServiceNames()    # List all services
 
 - [README.md](README.md) - User guide and quickstart
 - [CLAUDE.md](CLAUDE.md) - AI development guardrails
-- [CLEANUP_PLAN.md](CLEANUP_PLAN.md) - Detailed optimization plan
-- [CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md) - What was deleted and why
+- [docs/CLEANUP_PLAN.md](docs/CLEANUP_PLAN.md) - Detailed optimization plan
+- [docs/CLEANUP_SUMMARY.md](docs/CLEANUP_SUMMARY.md) - What was deleted and why
 - [docs/guides/troubleshooting.md](docs/guides/troubleshooting.md) - Common issues
 
 ---

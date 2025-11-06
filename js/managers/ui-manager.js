@@ -1,6 +1,6 @@
 /**
  * UI Manager - 统一的 UI 状态和事件管理
- * Phase 3: 模块化重构 - 发布-订阅模式
+ *  模块化重构 - 发布-订阅模式
  *
  * 设计原则:
  * - Single Responsibility: 只负责 UI 更新和事件管理
@@ -418,7 +418,7 @@ export class UIManager {
    */
   showError(message) {
     // Alert 弹窗
-    alert(`❌ ${message}`);
+    alert(` ${message}`);
 
     // 更新警告框
     if (this.elements.warningBox && this.elements.warningText) {

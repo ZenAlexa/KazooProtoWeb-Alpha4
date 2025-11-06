@@ -57,13 +57,13 @@ export class SpectralFeatures {
         this.analyser.smoothingTimeConstant = 0;  // 禁用内置平滑
         config.sourceNode.connect(this.analyser);
         this.useNativeFFT = true;
-        console.log('[SpectralFeatures] ✅ 使用原生 AnalyserNode FFT');
+        console.log('[SpectralFeatures]  使用原生 AnalyserNode FFT');
       } catch (error) {
-        console.warn('[SpectralFeatures] ⚠️ AnalyserNode 创建失败，降级到纯 JS FFT:', error);
+        console.warn('[SpectralFeatures]  AnalyserNode 创建失败，降级到纯 JS FFT:', error);
         this.useNativeFFT = false;
       }
     } else {
-      console.log('[SpectralFeatures] ℹ️ 未提供 audioContext/sourceNode，使用纯 JS FFT');
+      console.log('[SpectralFeatures] ℹ 未提供 audioContext/sourceNode，使用纯 JS FFT');
     }
 
     // FFT 降频控制
@@ -96,12 +96,12 @@ export class SpectralFeatures {
    */
   setSourceNode(sourceNode) {
     if (!this.audioContext) {
-      console.warn('[SpectralFeatures] ⚠️ 无 audioContext，无法启用 AnalyserNode');
+      console.warn('[SpectralFeatures]  无 audioContext，无法启用 AnalyserNode');
       return false;
     }
 
     if (this.analyser) {
-      console.warn('[SpectralFeatures] ⚠️ AnalyserNode 已存在，跳过重复设置');
+      console.warn('[SpectralFeatures]  AnalyserNode 已存在，跳过重复设置');
       return true;
     }
 
@@ -111,10 +111,10 @@ export class SpectralFeatures {
       this.analyser.smoothingTimeConstant = 0;  // 禁用内置平滑
       sourceNode.connect(this.analyser);
       this.useNativeFFT = true;
-      console.log('[SpectralFeatures] ✅ 已启用原生 AnalyserNode FFT (延迟注入)');
+      console.log('[SpectralFeatures]  已启用原生 AnalyserNode FFT (延迟注入)');
       return true;
     } catch (error) {
-      console.error('[SpectralFeatures] ❌ AnalyserNode 创建失败:', error);
+      console.error('[SpectralFeatures]  AnalyserNode 创建失败:', error);
       this.useNativeFFT = false;
       return false;
     }
@@ -218,7 +218,7 @@ export class SpectralFeatures {
     // 3. 气声度 (Breathiness / Spectral Flatness)
     const breathiness = this._calculateFlatness(relevantSpectrum);
 
-    // 4. 共振峰估计 (Formant - Phase 2 简化版)
+    // 4. 共振峰估计 (Formant
     // 使用 Spectral Centroid 作为近似
     const formant = AudioUtils.clamp(spectralCentroid, 500, 3000);
 

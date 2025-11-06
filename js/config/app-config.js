@@ -469,13 +469,13 @@ class ConfigManager {
     this._frozen = true;
 
     console.log('[ConfigManager] 配置加载成功');
-    console.log('[ConfigManager] 版本:', this._config.version || 'unknown');  // 🔍 显示版本号
+    console.log('[ConfigManager] 版本:', this._config.version || 'unknown');  //  显示版本号
     console.log('[ConfigManager] 预设:', preset || 'default');
     console.log('[ConfigManager] 采样率:', this._config.audio.sampleRate);
     console.log('[ConfigManager] 缓冲区:', this._config.audio.bufferSize);
     console.log('[ConfigManager] Worklet:', this._config.audio.useWorklet);
-    console.log('[ConfigManager] minVolumeThreshold:', this._config.pitchDetector?.minVolumeThreshold);  // 🔍 调试
-    console.log('[ConfigManager] minConfidence:', this._config.pitchDetector?.minConfidence);  // 🔍 调试
+    console.log('[ConfigManager] minVolumeThreshold:', this._config.pitchDetector?.minVolumeThreshold);  //  调试
+    console.log('[ConfigManager] minConfidence:', this._config.pitchDetector?.minConfidence);  //  调试
 
     return this._config;
   }

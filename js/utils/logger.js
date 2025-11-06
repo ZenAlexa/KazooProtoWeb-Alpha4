@@ -51,10 +51,10 @@ const CONSOLE_METHOD = {
  * @private
  */
 const LEVEL_EMOJI = {
-  [LOG_LEVEL.DEBUG]: '🔍',
-  [LOG_LEVEL.INFO]: 'ℹ️',
-  [LOG_LEVEL.WARN]: '⚠️',
-  [LOG_LEVEL.ERROR]: '❌'
+  [LOG_LEVEL.DEBUG]: '',
+  [LOG_LEVEL.INFO]: 'ℹ',
+  [LOG_LEVEL.WARN]: '',
+  [LOG_LEVEL.ERROR]: ''
 };
 
 /**

@@ -2,7 +2,7 @@
  * 性能监控模块
  * 监控延迟、帧率和系统性能
  *
- * Phase 1 增强:
+ * 增强:
  * - 支持 AudioWorklet 模式指标
  * - 记录处理器类型 (worklet/script-processor)
  * - Worklet 性能统计集成
@@ -22,7 +22,7 @@ class PerformanceMonitor {
             lastFrameTime: 0,
             bufferSize: 0,
             sampleRate: 0,
-            // Phase 1: AudioWorklet 指标
+            //  AudioWorklet 指标
             mode: 'unknown',    // 'worklet' | 'script-processor'
             workletStats: null  // Worklet 性能统计
         };
@@ -63,7 +63,7 @@ class PerformanceMonitor {
     }
 
     /**
-     * 更新 Worklet 统计信息 (Phase 1)
+     * 更新 Worklet 统计信息
      * @param {Object} workletStats - Worklet 性能统计
      */
     updateWorkletStats(workletStats) {
@@ -172,7 +172,7 @@ class PerformanceMonitor {
             fps: this.metrics.fps,
             bufferSize: this.metrics.bufferSize,
             sampleRate: this.metrics.sampleRate,
-            // Phase 1: 新增字段
+            //  新增字段
             mode: this.metrics.mode,
             workletStats: this.metrics.workletStats
         };
@@ -273,7 +273,7 @@ class PerformanceMonitor {
     }
 }
 
-// Phase 3 Step 2 Layer 2: 移除全局实例创建
+// Step 2 Layer 2: 移除全局实例创建
 // 实例现在由 AppContainer 统一管理
 // 旧代码: const performanceMonitor = new PerformanceMonitor();
 //

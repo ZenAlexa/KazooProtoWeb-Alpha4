@@ -13,27 +13,27 @@
  * 旧: PitchDetector → Note("C4") → triggerAttack("C4") → 固定频率
  * 新: PitchDetector → Frequency(Hz) → 平滑 → oscillator.frequency → 实时跟随
  *
- * Phase 2.10 P0 修复:
+ * P0 修复:
  * - 乐器预设从代码分离到 instrument-presets.js
  * - 支持运行时加载自定义音色
  * - 噪声层参数从集中式配置读取
  *
  * @class ContinuousSynthEngine
  * @author Kazoo Proto Team
- * @version 2.0.1-alpha (Phase 2.10)
+ * @version 2.0.1-alpha
  */
 
 class ContinuousSynthEngine {
     /**
      * @param {Object} options - 配置选项
-     * @param {Object} options.appConfig - Phase 2.10: 集中式配置对象
-     * @param {Object} options.instrumentPresets - Phase 2.10: 乐器预设对象 (可选)
+     * @param {Object} options.appConfig: 集中式配置对象
+     * @param {Object} options.instrumentPresets: 乐器预设对象 (可选)
      */
     constructor(options = {}) {
-        // Phase 2.10: 存储集中式配置
+        //  存储集中式配置
         this.appConfig = options.appConfig || null;
 
-        // Phase 2.10: 乐器预设配置 (从外部加载,向后兼容)
+        //  乐器预设配置 (从外部加载,向后兼容)
         this.instrumentPresets = options.instrumentPresets || {
             saxophone: {
                 oscillator: { type: 'sawtooth' },
@@ -164,7 +164,7 @@ class ContinuousSynthEngine {
         this.lastValidPitchTime = 0;
         this.silenceCheckInterval = null;
 
-        // Phase 2.7: Articulation 状态追踪
+        //  Articulation 状态追踪
         this.lastArticulationState = 'silence';
 
         // 效果器链
@@ -184,8 +184,8 @@ class ContinuousSynthEngine {
             wet: 0.2
         }).toDestination();
 
-        // Phase 2.7: 噪声层 (用于 breathiness 特征)
-        // Phase 2.9: 延迟 start() 到 initialize()，避免 AudioContext 警告
+        //  噪声层 (用于 breathiness 特征)
+        //  延迟 start() 到 initialize()，避免 AudioContext 警告
         this.noiseSource = new Tone.Noise('white');
         this.noiseGain = new Tone.Gain(0); // 初始静音
         this.noiseFilter = new Tone.Filter({
@@ -211,17 +211,17 @@ class ContinuousSynthEngine {
         };
 
         console.log('[ContinuousSynth] ✓ Initialized with continuous frequency tracking');
-        console.log('[ContinuousSynth] ✓ Phase 2.7 Expressive Features: cents, brightness, breathiness, articulation');
+        console.log('[ContinuousSynth] ✓ Expressive Features: cents, brightness, breathiness, articulation');
     }
 
     /**
      * 初始化合成器
      */
     async initialize() {
-        // Phase 2.9: 确保在用户手势后启动 AudioContext
+        //  确保在用户手势后启动 AudioContext
         await Tone.start();
 
-        // Phase 2.9: 启动噪声源 (之前在构造函数中启动会触发警告)
+        //  启动噪声源 (之前在构造函数中启动会触发警告)
         if (this.noiseSource && this.noiseSource.state !== 'started') {
             this.noiseSource.start();
         }
@@ -262,7 +262,7 @@ class ContinuousSynthEngine {
      * @param {Object} pitchInfo - { frequency, note, octave, confidence, volume }
      */
     /**
-     * Phase 2.7: 处理完整的 PitchFrame (包含表现力特征)
+     *  处理完整的 PitchFrame (包含表现力特征)
      *
      * @param {PitchFrame} pitchFrame - 完整的音高和表现力数据
      */
@@ -272,11 +272,11 @@ class ContinuousSynthEngine {
         const {
             frequency,
             confidence,
-            cents,           // Phase 2.7: 音分偏移
-            brightness,      // Phase 2.7: 音色亮度
-            breathiness,     // Phase 2.7: 气声度
-            articulation,    // Phase 2.7: 起音状态
-            volumeLinear     // Phase 2.7: 音量
+            cents,           //  音分偏移
+            brightness,      //  音色亮度
+            breathiness,     //  气声度
+            articulation,    //  起音状态
+            volumeLinear     //  音量
         } = pitchFrame;
 
         const now = Date.now();
@@ -289,19 +289,19 @@ class ContinuousSynthEngine {
             // 记录有效音高时间
             this.lastValidPitchTime = now;
 
-            // Phase 2.7 Task 4: Articulation → ADSR Trigger
+            // Task 4: Articulation → ADSR Trigger
             // 检测状态转换，触发 attack/release
             this.handleArticulation(articulation, frequency, volumeLinear);
 
             // 如果正在播放，更新表现力参数
             if (this.isPlaying) {
-                // Phase 2.7 Task 1: Cents → Pitch Bend
+                // Task 1: Cents → Pitch Bend
                 this.updateFrequencyWithCents(frequency, cents, now);
 
-                // Phase 2.7 Task 2: Brightness → Filter Cutoff
+                // Task 2: Brightness → Filter Cutoff
                 this.updateBrightness(brightness);
 
-                // Phase 2.7 Task 3: Breathiness → Noise Layer
+                // Task 3: Breathiness → Noise Layer
                 this.updateBreathiness(breathiness, frequency);
             }
         } else {
@@ -359,12 +359,12 @@ class ContinuousSynthEngine {
 
             console.log(`[ContinuousSynth] ▶ Started at ${initialFrequency.toFixed(1)} Hz (velocity: ${velocity.toFixed(2)})`);
         } catch (error) {
-            console.error('[ContinuousSynth] ❌ Start error:', error);
+            console.error('[ContinuousSynth]  Start error:', error);
         }
     }
 
     /**
-     * Phase 2.7 Task 1: 使用 cents 进行精细 pitch bend
+     * Task 1: 使用 cents 进行精细 pitch bend
      *
      * @param {number} frequency - 基础频率 (Hz)
      * @param {number} cents - 音分偏移 (-50 ~ +50)
@@ -405,7 +405,7 @@ class ContinuousSynthEngine {
 
             // Debug 日志（仅在 cents 明显时）
             if (Math.abs(cents) > 15) {
-                console.log(`[ContinuousSynth] 🎵 Pitch bend: ${cents.toFixed(1)} cents → ${adjustedFrequency.toFixed(1)} Hz`);
+                console.log(`[ContinuousSynth]  Pitch bend: ${cents.toFixed(1)} cents → ${adjustedFrequency.toFixed(1)} Hz`);
             }
         }
     }
@@ -419,7 +419,7 @@ class ContinuousSynthEngine {
     }
 
     /**
-     * Phase 2.7 Task 2: 使用 brightness 控制 filter cutoff
+     * Task 2: 使用 brightness 控制 filter cutoff
      *
      * 🔥 紧急修复 (2025-01-01): 重新设计映射算法
      *
@@ -460,9 +460,9 @@ class ContinuousSynthEngine {
     }
 
     /**
-     * Phase 2.7 Task 3: 使用 breathiness 控制噪声层强度
+     * Task 3: 使用 breathiness 控制噪声层强度
      *
-     * Phase 2.10 P0 修复: noiseGainMax 从集中式配置读取
+     * P0 修复: noiseGainMax 从集中式配置读取
      *
      * @param {number} breathiness - 气声度 (0-1, 来自频谱平坦度)
      * @param {number} frequency - 当前频率 (用于调整噪声滤波器中心频率)
@@ -470,7 +470,7 @@ class ContinuousSynthEngine {
     updateBreathiness(breathiness, frequency) {
         if (breathiness === undefined || breathiness === null) return;
 
-        // Phase 2.10: 从集中式配置读取最大噪声增益
+        //  从集中式配置读取最大噪声增益
         const noiseGainMax = this.appConfig?.synthesizer?.noiseGainMax ?? 0.3;
 
         // 限制噪声最大强度 (避免过度嘈杂)
@@ -492,7 +492,7 @@ class ContinuousSynthEngine {
     }
 
     /**
-     * Phase 2.7 Task 4: 处理 articulation 状态转换，触发 ADSR
+     * Task 4: 处理 articulation 状态转换，触发 ADSR
      *
      * @param {string} articulation - 当前起音状态 ('attack'|'sustain'|'release'|'silence')
      * @param {number} frequency - 当前频率
@@ -510,7 +510,7 @@ class ContinuousSynthEngine {
             const startLabel = articulation === 'attack'
                 ? 'Attack detected - triggering new note'
                 : 'Sustain bootstrap - starting note';
-            console.log(`[ContinuousSynth] 🎵 ${startLabel}`);
+            console.log(`[ContinuousSynth]  ${startLabel}`);
 
             if (!this.isPlaying) {
                 // 启动合成器
@@ -551,7 +551,7 @@ class ContinuousSynthEngine {
             this.vibrato.depth.rampTo(vibratoDepth, 0.05);
         }
 
-        // Phase 2.7: 使用新的 brightness 控制（如果可用）
+        //  使用新的 brightness 控制（如果可用）
         if (brightness !== undefined) {
             this.updateBrightness(brightness);
         } else if (volume) {
@@ -561,7 +561,7 @@ class ContinuousSynthEngine {
             this.filter.frequency.rampTo(filterFreq, 0.05);
         }
 
-        // Phase 2.7: 使用新的 breathiness 控制（如果可用）
+        //  使用新的 breathiness 控制（如果可用）
         if (breathiness !== undefined) {
             this.updateBreathiness(breathiness, pitchInfo.frequency);
         }
@@ -609,7 +609,7 @@ class ContinuousSynthEngine {
 
                 console.log('[ContinuousSynth] ■ Stopped');
             } catch (error) {
-                console.error('[ContinuousSynth] ❌ Stop error:', error);
+                console.error('[ContinuousSynth]  Stop error:', error);
             }
         }
     }
@@ -681,7 +681,7 @@ class ContinuousSynthEngine {
         this.filter.dispose();
         this.reverb.dispose();
 
-        // Phase 2.7: 清理噪声层
+        //  清理噪声层
         if (this.noiseSource) this.noiseSource.dispose();
         if (this.noiseGain) this.noiseGain.dispose();
         if (this.noiseFilter) this.noiseFilter.dispose();
@@ -690,7 +690,7 @@ class ContinuousSynthEngine {
     }
 }
 
-// Phase 3 Step 2 Layer 2: 移除全局实例创建，解决双实例问题
+// Step 2 Layer 2: 移除全局实例创建，解决双实例问题
 // 实例现在由 AppContainer 统一管理（注入配置和预设）
 // 旧代码: const continuousSynthEngine = new ContinuousSynthEngine();
 //

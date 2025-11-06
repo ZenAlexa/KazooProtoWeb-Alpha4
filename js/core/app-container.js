@@ -1,6 +1,6 @@
 /**
  * 依赖注入容器 (Dependency Injection Container)
- * Phase 3: 模块化重构 - 控制反转 (IoC)
+ *  模块化重构 - 控制反转 (IoC)
  *
  * 基于 Service Locator 模式,实现单例管理和依赖自动解析
  *
@@ -111,7 +111,7 @@ export class AppContainer {
     this.services.set(name, config);
 
     if (this.debug) {
-      console.log(`[AppContainer] ✅ 注册服务: ${name}`, {
+      console.log(`[AppContainer]  注册服务: ${name}`, {
         singleton: config.singleton,
         dependencies: config.dependencies
       });
@@ -175,12 +175,12 @@ export class AppContainer {
       }
 
       if (this.debug) {
-        console.log(`[AppContainer] ✅ 服务已创建: ${name}`);
+        console.log(`[AppContainer]  服务已创建: ${name}`);
       }
 
       return instance;
     } catch (error) {
-      console.error(`[AppContainer] ❌ 创建服务失败: ${name}`, error);
+      console.error(`[AppContainer]  创建服务失败: ${name}`, error);
       throw error;
     } finally {
       // 移除创建标记
@@ -216,13 +216,13 @@ export class AppContainer {
     if (name) {
       this.services.delete(name);
       if (this.debug) {
-        console.log(`[AppContainer] 🗑️  清空服务: ${name}`);
+        console.log(`[AppContainer] 🗑  清空服务: ${name}`);
       }
     } else {
       this.services.clear();
       this.creating.clear();
       if (this.debug) {
-        console.log('[AppContainer] 🗑️  清空所有服务');
+        console.log('[AppContainer] 🗑  清空所有服务');
       }
     }
   }

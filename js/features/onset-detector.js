@@ -1,6 +1,6 @@
 /**
  * 起音检测模块 - Onset Detector
- * Phase 2.4: 起音状态检测器
+ *  起音状态检测器
  *
  * 功能：检测音频的起音状态 (attack/sustain/release/silence)
  * 原理：基于能量包络的时域分析

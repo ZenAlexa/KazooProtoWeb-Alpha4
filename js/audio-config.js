@@ -2,10 +2,10 @@
  * 音频系统配置常量
  * 集中管理所有音频相关的配置参数
  *
- * Phase 1: 低延迟音频基础
+ *  低延迟音频基础
  * 提取配置常量，便于 AudioWorklet 迁移和 A/B 测试
  *
- * ⚠️ DEPRECATED (Phase 2.10):
+ *  DEPRECATED:
  * 本文件已被废弃，请使用集中式配置系统:
  *   import configManager from './config/app-config.js';
  *   const config = configManager.load();
@@ -15,10 +15,10 @@
  *   - docs/CONFIGURATION.md
  *   - docs/CONFIG_EXAMPLES.md
  *
- * 本文件保留仅为向后兼容，将在 Phase 3 移除。
+ * 本文件保留仅为向后兼容，将在 移除。
  */
 
-console.warn('[audio-config.js] ⚠️ DEPRECATED: Please use js/config/app-config.js instead');
+console.warn('[audio-config.js]  DEPRECATED: Please use js/config/app-config.js instead');
 
 const AUDIO_CONFIG = {
     // === 采样配置 ===
@@ -39,7 +39,7 @@ const AUDIO_CONFIG = {
     LATENCY_HINT: 'interactive',     // 'interactive' | 'balanced' | 'playback'
 
     // === Feature Flags ===
-    USE_AUDIO_WORKLET: true,         // 启用 AudioWorklet (Phase 1 核心)
+    USE_AUDIO_WORKLET: true,         // 启用 AudioWorklet (核心)
     WORKLET_FALLBACK: true,          // 自动回退到 ScriptProcessor
 
     // === 音高检测配置 ===
@@ -56,7 +56,7 @@ const AUDIO_CONFIG = {
     PERFORMANCE: {
         FPS_HISTORY_SIZE: 30,
         PROCESSING_HISTORY_SIZE: 50,
-        TARGET_LATENCY_MS: 15,       // Phase 1 目标
+        TARGET_LATENCY_MS: 15,       // 目标
         MAX_ACCEPTABLE_LATENCY_MS: 30,
     },
 
@@ -198,15 +198,15 @@ function logAudioConfig() {
     const theoreticalLatency = calculateTheoreticalLatency(recommendedBuffer, AUDIO_CONFIG.SAMPLE_RATE);
 
     console.group('[AudioConfig] 音频系统配置');
-    console.log('🎵 采样率:', AUDIO_CONFIG.SAMPLE_RATE, 'Hz');
-    console.log('📦 推荐 Buffer:', recommendedBuffer, 'samples');
-    console.log('⏱️  理论延迟:', theoreticalLatency.toFixed(2), 'ms');
-    console.log('🔧 AudioWorklet:', AUDIO_CONFIG.USE_AUDIO_WORKLET ? '启用' : '禁用');
+    console.log(' 采样率:', AUDIO_CONFIG.SAMPLE_RATE, 'Hz');
+    console.log(' 推荐 Buffer:', recommendedBuffer, 'samples');
+    console.log('⏱  理论延迟:', theoreticalLatency.toFixed(2), 'ms');
+    console.log(' AudioWorklet:', AUDIO_CONFIG.USE_AUDIO_WORKLET ? '启用' : '禁用');
     console.log('🌐 浏览器:', `${compat.browser} ${compat.version}`);
-    console.log('✅ AudioWorklet 支持:', compat.workletSupported ? '是' : '否');
+    console.log(' AudioWorklet 支持:', compat.workletSupported ? '是' : '否');
 
     if (compat.issues.length > 0) {
-        console.warn('⚠️  兼容性问题:', compat.issues);
+        console.warn('  兼容性问题:', compat.issues);
     }
 
     console.groupEnd();

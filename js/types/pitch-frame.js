@@ -1,7 +1,7 @@
 /**
  * PitchFrame 类型定义
  *
- * 这是 Phase 2 的核心数据结构，整合了音高、音量、表现力等所有特征。
+ * 这是 的核心数据结构，整合了音高、音量、表现力等所有特征。
  * 由 ExpressiveFeatures 生成，供 Continuous/Legacy 合成引擎消费。
  *
  * @module types/pitch-frame
@@ -14,31 +14,31 @@
  *
  * @property {number} timestamp - 时间戳 (ms)
  *
- * // ===== 基础音高数据 (Phase 1 已有) =====
+ * // ===== 基础音高数据 (已有) =====
  * @property {number} frequency - 频率 (Hz, 范围: 80-800)
  * @property {string} note - 音符名称 (如 "C4", "A#5")
  * @property {number} octave - 八度 (范围: 0-8)
  * @property {number} confidence - YIN 置信度 (0-1, 越高越可靠)
  *
- * // ===== Phase 2 新增: 动态特征 =====
+ * // ===== 新增: 动态特征 =====
  * @property {number} volumeDb - 音量 (dB, 范围: -60 ~ 0)
  * @property {number} volumeLinear - 音量线性 (归一化, 范围: 0-1)
  *
- * // ===== Phase 2 新增: 音高精度 =====
+ * // ===== 新增: 音高精度 =====
  * @property {number} cents - 音分偏移 (范围: -50 ~ +50)
  *                            相对于最接近的十二平均律音高
  * @property {number} pitchStability - 音高稳定性 (0-1, 0=不稳定, 1=稳定)
  *
- * // ===== Phase 2 新增: 时域特征 =====
+ * // ===== 新增: 时域特征 =====
  * @property {('attack'|'sustain'|'release'|'silence')} articulation
  *           起音状态 (attack=新音符, sustain=持续, release=释放, silence=静音)
  * @property {number} attackTime - 起音时间 (ms, 范围: 0-200)
  *
- * // ===== Phase 2 新增: 频域特征 =====
+ * // ===== 新增: 频域特征 =====
  * @property {number} spectralCentroid - 频谱质心 (Hz, 范围: 0-8000)
  * @property {number} brightness - 音色亮度 (归一化, 范围: 0-1)
  * @property {number} formant - 共振峰估计 (Hz, 范围: 500-3000)
- *                              Phase 2 使用 Spectral Centroid 近似
+ *                              使用 Spectral Centroid 近似
  * @property {number} breathiness - 气声度/频谱平坦度 (0-1, 0=纯音, 1=白噪声)
  *
  * // ===== 原始数据 (调试用) =====

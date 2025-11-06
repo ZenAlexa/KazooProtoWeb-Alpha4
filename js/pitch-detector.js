@@ -271,7 +271,7 @@ class PitchDetector {
     }
 }
 
-// Phase 3 Step 2 Layer 2: 移除全局实例创建
+// Step 2 Layer 2: 移除全局实例创建
 // 实例现在由 AppContainer 统一管理
 // 旧代码: const pitchDetector = new PitchDetector();
 //

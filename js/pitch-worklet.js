@@ -1,13 +1,13 @@
 /**
  * AudioWorklet Pitch Detector Processor
  *
- * Phase 1 完成版: 集成 YIN 音高检测算法
+ * 完成版: 集成 YIN 音高检测算法
  * - 在 AudioWorklet 线程中运行 YIN 算法
  * - 实时音高检测和平滑处理
  * - 完整的音符信息计算
  * - 与 pitch-detector.js API 兼容
  *
- * Phase 2.9 扩展: 表现力特征提取
+ * 扩展: 表现力特征提取
  * - SimpleFFT: Spectral Centroid (brightness) + Flatness (breathiness)
  * - EMA 平滑滤波器
  * - 简化 OnsetDetector
@@ -20,7 +20,7 @@
  */
 
 /**
- * Phase 2.9: 简化 FFT 实现
+ *  简化 FFT 实现
  *
  * 用于计算频谱特征 (Spectral Centroid, Flatness)
  * 替代主线程的 AnalyserNode，使 Worklet 自给自足
@@ -124,7 +124,7 @@ class SimpleFFT {
 }
 
 /**
- * Phase 2.9: EMA 滤波器 (指数移动平均)
+ *  EMA 滤波器 (指数移动平均)
  *
  * 用于平滑 volume, brightness, breathiness
  * 比 Kalman Filter 简单，性能更好
@@ -150,9 +150,9 @@ class EMAFilter {
 }
 
 /**
- * Phase 2.9: 简化起音检测器
+ *  简化起音检测器
  *
- * 基于能量突增检测，比 Phase 2.4 的完整版简单
+ * 基于能量突增检测，比 的完整版简单
  * 适用于持续哼唱场景 (不需要 6dB 突增阈值)
  *
  * 状态机:
@@ -163,7 +163,7 @@ class EMAFilter {
  */
 class SimpleOnsetDetector {
     constructor(config = {}) {
-        this.energyThreshold = config.energyThreshold ?? 3;  // dB (比 Phase 2.4 的 6dB 更宽松)
+        this.energyThreshold = config.energyThreshold ?? 3;  // dB (比 的 6dB 更宽松)
         this.historySize = config.historySize ?? 5;
         this.silenceThreshold = config.silenceThreshold ?? -40;  // dB
         this.minStateDuration = config.minStateDuration ?? 50;  // ms
@@ -261,10 +261,10 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
     constructor(options) {
         super();
 
-        console.log('[PitchWorklet] 🎵 Worklet 处理器已创建 - Phase 2.10 配置下发修复版');
+        console.log('[PitchWorklet]  Worklet 处理器已创建
 
-        // Phase 2.10: 配置参数 (从主线程接收,等待 'config' 消息更新)
-        // ⚠️ 修复: 不再使用硬编码默认值,等待主线程下发集中式配置
+        //  配置参数 (从主线程接收,等待 'config' 消息更新)
+        //  修复: 不再使用硬编码默认值,等待主线程下发集中式配置
         this.config = {
             sampleRate: sampleRate, // AudioWorkletGlobalScope 提供
             algorithm: 'YIN',
@@ -293,25 +293,25 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
         this.accumulationIndex = 0;
         this.accumulationFull = false;
 
-        // Phase 2.9: FFT 处理器
+        //  FFT 处理器
         this.fft = new SimpleFFT(2048);
-        console.log('[PitchWorklet] ✅ SimpleFFT 初始化完成 (2048 点)');
+        console.log('[PitchWorklet]  SimpleFFT 初始化完成 (2048 点)');
 
-        // Phase 2.9: EMA 平滑滤波器
+        //  EMA 平滑滤波器
         this.volumeFilter = new EMAFilter(0.3);       // volume 平滑
         this.brightnessFilter = new EMAFilter(0.3);   // brightness 平滑
         this.breathinessFilter = new EMAFilter(0.4);  // breathiness 平滑 (稍快响应)
-        console.log('[PitchWorklet] ✅ EMA 滤波器初始化完成');
+        console.log('[PitchWorklet]  EMA 滤波器初始化完成');
 
-        // Phase 2.9: 简化起音检测器
+        //  简化起音检测器
         this.onsetDetector = new SimpleOnsetDetector({
             energyThreshold: 3,      // dB (宽松阈值，适合持续哼唱)
             silenceThreshold: -40,   // dB
             minStateDuration: 50     // ms
         });
-        console.log('[PitchWorklet] ✅ SimpleOnsetDetector 初始化完成');
+        console.log('[PitchWorklet]  SimpleOnsetDetector 初始化完成');
 
-        // Phase 2.9: 特征历史 (用于日志去重)
+        //  特征历史 (用于日志去重)
         this.lastLoggedBrightness = -1;
         this.lastLoggedBreathiness = -1;
 
@@ -340,7 +340,7 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
             }
         });
 
-        console.log('[PitchWorklet] ✅ Phase 2.9 Worklet 初始化完成 (YIN + FFT + EMA)');
+        console.log('[PitchWorklet]  Worklet 初始化完成 (YIN + FFT + EMA)');
     }
 
     /**
@@ -457,22 +457,22 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                 if (volume >= this.config.minVolumeThreshold) {
                     const frequency = this.detector(this.accumulationBuffer);
 
-                    // 🔍 调试: 记录 YIN 检测结果
+                    //  调试: 记录 YIN 检测结果
                     if (!frequency) {
                         // YIN 未检测到音高 (返回 null)
                         if (this.frameCount % 100 === 0) {  // 每 100 帧记录一次
-                            console.log(`[PitchWorklet] 🔍 YIN 未检测到音高 (volume: ${volume.toFixed(3)})`);
+                            console.log(`[PitchWorklet]  YIN 未检测到音高 (volume: ${volume.toFixed(3)})`);
                         }
                     } else if (frequency <= 0 || frequency >= 2000) {
                         // 频率超出合理范围
-                        console.log(`[PitchWorklet] ⚠️ 频率超出范围: ${frequency.toFixed(1)} Hz (volume: ${volume.toFixed(3)})`);
+                        console.log(`[PitchWorklet]  频率超出范围: ${frequency.toFixed(1)} Hz (volume: ${volume.toFixed(3)})`);
                     } else if (frequency < this.config.minFrequency || frequency > this.config.maxFrequency) {
                         // 频率超出配置范围
-                        console.log(`[PitchWorklet] ⚠️ 频率超出配置范围: ${frequency.toFixed(1)} Hz (配置: ${this.config.minFrequency}-${this.config.maxFrequency} Hz)`);
+                        console.log(`[PitchWorklet]  频率超出配置范围: ${frequency.toFixed(1)} Hz (配置: ${this.config.minFrequency}-${this.config.maxFrequency} Hz)`);
                     }
 
                     if (frequency && frequency > 0 && frequency < 2000) {
-                        // 🔧 临时放宽频率范围检查 (调试用)
+                        //  临时放宽频率范围检查 (调试用)
                         // 原始检查: frequency >= this.config.minFrequency && frequency <= this.config.maxFrequency
                         // 临时改为: 只检查合理范围 20-2000 Hz
                         if (frequency >= 20 && frequency <= 2000) {  // 🔥 临时修复
@@ -496,18 +496,18 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                                 volume
                             );
 
-                            // Phase 2.9: FFT 频谱分析
+                            //  FFT 频谱分析
                             const powerSpectrum = this.fft.computePowerSpectrum(this.accumulationBuffer);
                             const spectralCentroid = this.fft.computeSpectralCentroid(powerSpectrum, this.config.sampleRate);
                             const spectralFlatness = this.fft.computeSpectralFlatness(powerSpectrum);
 
                             this.stats.fftComputations++;
 
-                            // Phase 2.9: 映射到 PitchFrame 字段
+                            //  映射到 PitchFrame 字段
                             const rawBrightness = this._normalizeBrightness(spectralCentroid);
                             const rawBreathiness = Math.min(spectralFlatness, 1.0);
 
-                            // Phase 2.9: EMA 平滑
+                            //  EMA 平滑
                             const smoothedVolume = this.volumeFilter.update(volume);
                             const smoothedBrightness = this.brightnessFilter.update(rawBrightness);
                             const smoothedBreathiness = this.breathinessFilter.update(rawBreathiness);
@@ -515,17 +515,17 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                             // 计算 volumeDb
                             const volumeDb = smoothedVolume > 0 ? 20 * Math.log10(smoothedVolume) : -100;
 
-                            // Phase 2.9: 起音检测
+                            //  起音检测
                             const articulation = this.onsetDetector.detect(volumeDb, currentTime);
 
-                            // 🔍 调试: 记录成功检测 (每 50 次记录一次)
+                            //  调试: 记录成功检测 (每 50 次记录一次)
                             if (this.stats.pitchDetections % 50 === 0) {
-                                console.log(`[PitchWorklet] ✅ 检测到音高: ${smoothedFrequency.toFixed(1)} Hz (${noteInfo.note}${noteInfo.octave}), 置信度: ${confidence.toFixed(2)}, articulation: ${articulation}`);
+                                console.log(`[PitchWorklet]  检测到音高: ${smoothedFrequency.toFixed(1)} Hz (${noteInfo.note}${noteInfo.octave}), 置信度: ${confidence.toFixed(2)}, articulation: ${articulation}`);
                             }
 
-                            // Phase 2.9: 构造完整 PitchFrame (11 字段)
+                            //  构造完整 PitchFrame (11 字段)
                             pitchInfo = {
-                                // 基础音高字段 (Phase 1)
+                                // 基础音高字段
                                 frequency: smoothedFrequency,
                                 rawFrequency: frequency,
                                 note: noteInfo.note,
@@ -533,15 +533,15 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                                 cents: noteInfo.cents,
                                 confidence: confidence,
 
-                                // 音量字段 (Phase 2.9)
+                                // 音量字段
                                 volumeLinear: smoothedVolume,
                                 volumeDb: volumeDb,
 
-                                // 频谱特征 (Phase 2.9)
+                                // 频谱特征
                                 brightness: smoothedBrightness,
                                 breathiness: smoothedBreathiness,
 
-                                // 起音状态 (Phase 2.9)
+                                // 起音状态
                                 articulation: articulation,
 
                                 // 调试信息 (可选)
@@ -555,7 +555,7 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
 
                             this.stats.pitchDetections++;
 
-                            // Phase 2.9: 发送完整 PitchFrame 到主线程
+                            //  发送完整 PitchFrame 到主线程
                             // 附加 Worklet currentTime (转换为毫秒) 用于精确时序追踪
                             this.port.postMessage({
                                 type: 'pitch-frame',  // 新消息类型
@@ -563,7 +563,7 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
                                 timestamp: currentTime * 1000  // AudioContext.currentTime (秒) → 毫秒
                             });
 
-                            // Phase 1 兼容: 保留旧消息类型 (便于回退)
+                            // 兼容: 保留旧消息类型 (便于回退)
                             this.port.postMessage({
                                 type: 'pitch-detected',
                                 data: {
@@ -641,12 +641,12 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
     }
 
     /**
-     * 处理配置消息 (Phase 2.10: 接收主线程集中式配置)
+     * 处理配置消息 ( 接收主线程集中式配置)
      */
     _handleConfig(config) {
         console.log('[PitchWorklet] 📥 收到主线程配置:', config);
 
-        // Phase 2.10: 合并配置 (主线程配置覆盖默认值)
+        //  合并配置 (主线程配置覆盖默认值)
         const oldConfig = { ...this.config };
         this.config = {
             ...this.config,
@@ -655,39 +655,39 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
 
         // 关键参数变更日志
         if (oldConfig.clarityThreshold !== this.config.clarityThreshold) {
-            console.log(`[PitchWorklet] 🔧 clarityThreshold: ${oldConfig.clarityThreshold} → ${this.config.clarityThreshold}`);
+            console.log(`[PitchWorklet]  clarityThreshold: ${oldConfig.clarityThreshold} → ${this.config.clarityThreshold}`);
         }
         if (oldConfig.minFrequency !== this.config.minFrequency || oldConfig.maxFrequency !== this.config.maxFrequency) {
-            console.log(`[PitchWorklet] 🔧 频率范围: ${oldConfig.minFrequency}-${oldConfig.maxFrequency} → ${this.config.minFrequency}-${this.config.maxFrequency} Hz`);
+            console.log(`[PitchWorklet]  频率范围: ${oldConfig.minFrequency}-${oldConfig.maxFrequency} → ${this.config.minFrequency}-${this.config.maxFrequency} Hz`);
         }
 
-        // Phase 2.10: 更新 EMA 滤波器参数 (如果提供)
+        //  更新 EMA 滤波器参数 (如果提供)
         if (config.volumeAlpha !== undefined && this.volumeFilter) {
             this.volumeFilter.alpha = config.volumeAlpha;
-            console.log(`[PitchWorklet] 🔧 volumeAlpha: ${config.volumeAlpha}`);
+            console.log(`[PitchWorklet]  volumeAlpha: ${config.volumeAlpha}`);
         }
         if (config.brightnessAlpha !== undefined && this.brightnessFilter) {
             this.brightnessFilter.alpha = config.brightnessAlpha;
-            console.log(`[PitchWorklet] 🔧 brightnessAlpha: ${config.brightnessAlpha}`);
+            console.log(`[PitchWorklet]  brightnessAlpha: ${config.brightnessAlpha}`);
         }
 
-        // Phase 2.10: 更新起音检测器参数
+        //  更新起音检测器参数
         if (this.onsetDetector && (config.energyThreshold || config.silenceThreshold || config.minStateDuration)) {
             if (config.energyThreshold !== undefined) {
                 this.onsetDetector.energyThreshold = config.energyThreshold;
-                console.log(`[PitchWorklet] 🔧 energyThreshold: ${config.energyThreshold} dB`);
+                console.log(`[PitchWorklet]  energyThreshold: ${config.energyThreshold} dB`);
             }
             if (config.silenceThreshold !== undefined) {
                 this.onsetDetector.silenceThreshold = config.silenceThreshold;
-                console.log(`[PitchWorklet] 🔧 silenceThreshold: ${config.silenceThreshold} dB`);
+                console.log(`[PitchWorklet]  silenceThreshold: ${config.silenceThreshold} dB`);
             }
             if (config.minStateDuration !== undefined) {
                 this.onsetDetector.minStateDuration = config.minStateDuration;
-                console.log(`[PitchWorklet] 🔧 minStateDuration: ${config.minStateDuration} ms`);
+                console.log(`[PitchWorklet]  minStateDuration: ${config.minStateDuration} ms`);
             }
         }
 
-        // ⚠️ 注意: YIN 检测器不需要重新创建 (threshold 是内部固定值 0.1)
+        //  注意: YIN 检测器不需要重新创建 (threshold 是内部固定值 0.1)
         // clarityThreshold 用于置信度过滤,不影响 YIN 算法本身
 
         this.port.postMessage({
@@ -695,7 +695,7 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
             config: this.config
         });
 
-        console.log('[PitchWorklet] ✅ 配置已应用,Worklet 已使用主线程参数');
+        console.log('[PitchWorklet]  配置已应用,Worklet 已使用主线程参数');
     }
 
     /**
@@ -831,7 +831,7 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
     }
 
     /**
-     * Phase 2.9: 归一化 Brightness
+     *  归一化 Brightness
      *
      * 将 Spectral Centroid (Hz) 映射到 [0, 1] 范围
      *
@@ -927,4 +927,4 @@ class PitchDetectorWorklet extends AudioWorkletProcessor {
 // 注册处理器
 registerProcessor('pitch-detector', PitchDetectorWorklet);
 
-console.log('[PitchWorklet] ✅ PitchDetectorWorklet 已注册');
+console.log('[PitchWorklet]  PitchDetectorWorklet 已注册');

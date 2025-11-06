@@ -5,7 +5,7 @@
  * - AudioWorklet (现代, 低延迟)
  * - ScriptProcessor (回退, 兼容性)
  *
- * Phase 1: 低延迟音频基础
+ *  低延迟音频基础
  * 为 AudioWorklet 迁移提供清晰的抽象
  *
  * @class AudioIO
@@ -29,19 +29,19 @@ class AudioIO {
             sampleRate: 44100,
             bufferSize: 2048,        // ScriptProcessor 模式
             workletBufferSize: 128,  // AudioWorklet 模式
-            useWorklet: true,        // Phase 2.9: 启用 AudioWorklet 低延迟模式
+            useWorklet: true,        //  启用 AudioWorklet 低延迟模式
             workletFallback: true,   // 自动回退到 ScriptProcessor
             latencyHint: 'interactive',
             debug: false             // 调试模式
         };
 
-        // Phase 2.10: 存储主线程的集中式配置 (用于序列化到 Worklet)
+        //  存储主线程的集中式配置 (用于序列化到 Worklet)
         this.appConfig = null;  // 来自 configManager.get()
 
         // 回调函数
         this.onFrameCallback = null;           // 原始音频帧回调 (所有模式)
         this.onPitchDetectedCallback = null;   // 音高检测回调 (仅 Worklet 模式)
-        this.onWorkletPitchFrameCallback = null; // Phase 2.9: Worklet PitchFrame 专用回调
+        this.onWorkletPitchFrameCallback = null; //  Worklet PitchFrame 专用回调
         this.onErrorCallback = null;
         this.onStateChangeCallback = null;
 
@@ -62,15 +62,15 @@ class AudioIO {
      * @param {number} options.workletBufferSize - 缓冲大小 (AudioWorklet)
      * @param {boolean} options.useWorklet - 是否使用 AudioWorklet
      * @param {string} options.latencyHint - 延迟提示
-     * @param {Object} options.appConfig - Phase 2.10: 集中式配置对象 (来自 configManager)
+     * @param {Object} options.appConfig: 集中式配置对象 (来自 configManager)
      */
     configure(options = {}) {
         console.log('[AudioIO] 配置音频系统:', options);
 
-        // Phase 2.10: 保存集中式配置
+        //  保存集中式配置
         if (options.appConfig) {
             this.appConfig = options.appConfig;
-            console.log('[AudioIO] ✅ 已接收集中式配置');
+            console.log('[AudioIO]  已接收集中式配置');
         }
 
         this.config = {
@@ -97,7 +97,7 @@ class AudioIO {
         const startTime = performance.now();
 
         try {
-            console.group('🚀 [AudioIO] 启动音频系统');
+            console.group(' [AudioIO] 启动音频系统');
 
             // 1. 初始化 AudioContext
             await this._initializeAudioContext();
@@ -124,7 +124,7 @@ class AudioIO {
             const initTime = performance.now() - startTime;
             const result = this.getLatencyInfo();
 
-            console.log('✅ 启动成功:', {
+            console.log(' 启动成功:', {
                 mode: this.mode,
                 latency: result.totalLatency.toFixed(2) + 'ms',
                 sampleRate: this.audioContext.sampleRate + 'Hz',
@@ -138,7 +138,7 @@ class AudioIO {
             return result;
 
         } catch (error) {
-            console.error('❌ [AudioIO] 启动失败:', error);
+            console.error(' [AudioIO] 启动失败:', error);
             console.groupEnd();
             this._notifyError('start', error);
             throw error;
@@ -183,10 +183,10 @@ class AudioIO {
             this.isRunning = false;
             this._notifyStateChange('stopped', null);
 
-            console.log('✅ [AudioIO] 已停止');
+            console.log(' [AudioIO] 已停止');
 
         } catch (error) {
-            console.error('❌ [AudioIO] 停止时出错:', error);
+            console.error(' [AudioIO] 停止时出错:', error);
             this._notifyError('stop', error);
         }
     }
@@ -218,7 +218,7 @@ class AudioIO {
     }
 
     /**
-     * Phase 2.9: 注册 Worklet PitchFrame 专用回调
+     *  注册 Worklet PitchFrame 专用回调
      * @param {Function} callback - (pitchFrame: PitchFrame, timestamp: number) => void
      */
     onWorkletPitchFrame(callback) {
@@ -226,7 +226,7 @@ class AudioIO {
             throw new TypeError('[AudioIO] onWorkletPitchFrame callback must be a function');
         }
         this.onWorkletPitchFrameCallback = callback;
-        console.log('[AudioIO] ✅ 已注册 Worklet PitchFrame 回调');
+        console.log('[AudioIO]  已注册 Worklet PitchFrame 回调');
         return this;
     }
 
@@ -310,15 +310,15 @@ class AudioIO {
         }
 
         this.isInitialized = false;
-        console.log('✅ [AudioIO] 已销毁');
+        console.log(' [AudioIO] 已销毁');
     }
 
     // ==================== 私有方法 ====================
 
     /**
-     * Phase 2.10: 序列化配置并下发到 Worklet
+     *  序列化配置并下发到 Worklet
      *
-     * ⚠️ 关键修复: 将主线程集中式配置转换为 Worklet 可理解的参数
+     *  关键修复: 将主线程集中式配置转换为 Worklet 可理解的参数
      * 避免 Worklet 使用硬编码值,确保配置一致性
      *
      * @private
@@ -327,7 +327,7 @@ class AudioIO {
     _serializeConfigForWorklet() {
         // 如果没有集中式配置,使用回退默认值
         if (!this.appConfig) {
-            console.warn('[AudioIO] ⚠️ 未提供 appConfig,使用回退默认值');
+            console.warn('[AudioIO]  未提供 appConfig,使用回退默认值');
             return {
                 sampleRate: this.audioContext.sampleRate,
                 algorithm: 'YIN',
@@ -340,7 +340,7 @@ class AudioIO {
             };
         }
 
-        // Phase 2.10: 从集中式配置映射到 Worklet 参数
+        //  从集中式配置映射到 Worklet 参数
         const config = this.appConfig;
         const workletConfig = {
             // 基础参数
@@ -359,12 +359,12 @@ class AudioIO {
             // 音量阈值 (从集中式配置读取)
             minVolumeThreshold: config.pitchDetector?.minVolumeThreshold ?? 0.002,  // 🔥 从配置读取
 
-            // Phase 2.9: EMA 滤波器参数 (用于 Worklet 内部平滑)
+            //  EMA 滤波器参数 (用于 Worklet 内部平滑)
             volumeAlpha: config.smoothing?.volume?.alpha ?? 0.3,
             brightnessAlpha: config.smoothing?.brightness?.alpha ?? 0.3,
             breathinessAlpha: 0.4,  // 固定值
 
-            // Phase 2.9: 起音检测参数
+            //  起音检测参数
             energyThreshold: config.onset?.energyThreshold ?? 3,
             silenceThreshold: config.onset?.silenceThreshold ?? -40,
             minStateDuration: config.onset?.attackDuration ?? 50,
@@ -379,7 +379,7 @@ class AudioIO {
             clarityThreshold: workletConfig.clarityThreshold,
             minFrequency: workletConfig.minFrequency,
             maxFrequency: workletConfig.maxFrequency,
-            minVolumeThreshold: workletConfig.minVolumeThreshold,  // 🔍 调试日志
+            minVolumeThreshold: workletConfig.minVolumeThreshold,  //  调试日志
             energyThreshold: workletConfig.energyThreshold,
             silenceThreshold: workletConfig.silenceThreshold
         });
@@ -408,7 +408,7 @@ class AudioIO {
             await this.audioContext.resume();
         }
 
-        console.log('✅ AudioContext 已创建:', {
+        console.log(' AudioContext 已创建:', {
             sampleRate: this.audioContext.sampleRate,
             state: this.audioContext.state
         });
@@ -475,7 +475,7 @@ class AudioIO {
                     this.stream = await navigator.mediaDevices.getUserMedia({
                         audio: true  // 使用默认配置
                     });
-                    console.log('✅ 使用降级配置成功获取麦克风');
+                    console.log(' 使用降级配置成功获取麦克风');
                 } catch (fallbackError) {
                     throw new Error(
                         '麦克风不支持所需的音频配置\n\n' +
@@ -505,7 +505,7 @@ class AudioIO {
         this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
 
         const track = this.stream.getAudioTracks()[0];
-        console.log('✅ 麦克风已连接:', track.label || '默认设备');
+        console.log(' 麦克风已连接:', track.label || '默认设备');
     }
 
     /**
@@ -513,15 +513,15 @@ class AudioIO {
      * @private
      */
     async _setupAudioWorklet() {
-        console.log('⚙️  设置 AudioWorklet 处理链路...');
+        console.log('⚙  设置 AudioWorklet 处理链路...');
 
         try {
             // 1. 加载 Worklet 模块
             const workletPath = 'js/pitch-worklet.js';
-            console.log('📦 加载 Worklet 模块:', workletPath);
+            console.log(' 加载 Worklet 模块:', workletPath);
 
             await this.audioContext.audioWorklet.addModule(workletPath);
-            console.log('✅ Worklet 模块加载成功');
+            console.log(' Worklet 模块加载成功');
 
             // 2. 创建 AudioWorkletNode
             this.processorNode = new AudioWorkletNode(
@@ -533,13 +533,13 @@ class AudioIO {
                     outputChannelCount: [1]
                 }
             );
-            console.log('✅ AudioWorkletNode 已创建');
+            console.log(' AudioWorkletNode 已创建');
 
             // 3. 监听 Worklet 消息
             this.processorNode.port.onmessage = this._handleWorkletMessage.bind(this);
 
-            // 4. 发送初始配置 (Phase 2.10: 从 main.js 传入的集中式配置)
-            // ⚠️ 关键修复: 将主线程配置序列化并下发到 Worklet
+            // 4. 发送初始配置 ( 从 main.js 传入的集中式配置)
+            //  关键修复: 将主线程配置序列化并下发到 Worklet
             const workletConfig = this._serializeConfigForWorklet();
             this.processorNode.port.postMessage({
                 type: 'config',
@@ -548,20 +548,20 @@ class AudioIO {
             console.log('[AudioIO] 📤 配置已下发到 Worklet:', workletConfig);
 
             // 5. 连接节点链路
-            // Phase 2.10: 仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
+            //  仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
             // 合成器会单独连接到 destination 输出音色
             this.sourceNode.connect(this.processorNode);
             // REMOVED: this.processorNode.connect(this.audioContext.destination);
             console.log('🔗 AudioWorklet 链路: Mic → WorkletNode (分析用，不直接播放)');
 
-            console.log('✅ AudioWorklet 处理链路已建立');
+            console.log(' AudioWorklet 处理链路已建立');
 
         } catch (error) {
-            console.error('❌ AudioWorklet 设置失败:', error);
+            console.error(' AudioWorklet 设置失败:', error);
 
-            // Phase 1.7: 触发回退到 ScriptProcessor
+            //  触发回退到 ScriptProcessor
             if (this.config.workletFallback !== false) {
-                console.warn('⚠️  AudioWorklet 加载失败，自动回退到 ScriptProcessor 模式');
+                console.warn('  AudioWorklet 加载失败，自动回退到 ScriptProcessor 模式');
                 console.warn('   原因:', error.message);
                 console.warn('   影响: 延迟可能略高 (~46ms vs ~3ms)');
                 this.mode = 'script-processor';
@@ -581,11 +581,11 @@ class AudioIO {
 
         switch (type) {
             case 'ready':
-                console.log('[AudioIO] ✅ Worklet 已就绪, 采样率:', data.sampleRate);
+                console.log('[AudioIO]  Worklet 已就绪, 采样率:', data.sampleRate);
                 break;
 
             case 'pitch-detected':
-                // Phase 1: 传递音高检测结果到专用回调
+                //  传递音高检测结果到专用回调
                 if (this.onPitchDetectedCallback) {
                     this.onPitchDetectedCallback(data);
                 }
@@ -593,7 +593,7 @@ class AudioIO {
                 break;
 
             case 'pitch-frame':
-                // Phase 2.9: 完整 PitchFrame 数据 (11 字段)
+                //  完整 PitchFrame 数据 (11 字段)
                 // 使用 Worklet 提供的精确 timestamp (AudioContext.currentTime * 1000)
                 const frameTimestamp = timestamp || performance.now();
 
@@ -603,7 +603,7 @@ class AudioIO {
                     this.onWorkletPitchFrameCallback(data, frameTimestamp);
                 } else if (this.onFrameCallback) {
                     // Fallback: 如果未注册专用回调，使用通用 onFrame
-                    console.warn('[AudioIO] ⚠️ pitch-frame 未注册专用回调，使用 onFrame fallback');
+                    console.warn('[AudioIO]  pitch-frame 未注册专用回调，使用 onFrame fallback');
                     this.onFrameCallback(data, frameTimestamp);
                 }
                 // 注意: 不再触发 onPitchDetectedCallback，避免双重处理
@@ -619,7 +619,7 @@ class AudioIO {
                 break;
 
             case 'test-ping':
-                // Phase 1.6: 测试消息
+                //  测试消息
                 console.log('[AudioIO] Worklet Ping:', data);
                 break;
 
@@ -655,7 +655,7 @@ class AudioIO {
      * @private
      */
     async _setupScriptProcessor() {
-        console.log('⚙️  设置 ScriptProcessor 处理链路 (回退模式)...');
+        console.log('⚙  设置 ScriptProcessor 处理链路 (回退模式)...');
 
         this.processorNode = this.audioContext.createScriptProcessor(
             this.config.bufferSize,
@@ -688,7 +688,7 @@ class AudioIO {
         };
 
         // 连接节点链路
-        // Phase 2.10: ScriptProcessor 需要连接到 destination 才能触发 onaudioprocess 回调
+        //  ScriptProcessor 需要连接到 destination 才能触发 onaudioprocess 回调
         // 使用静音的 GainNode 避免直接回放麦克风输入（防止回声）
         // 合成器会单独连接到 destination 输出音色
         const silentGain = this.audioContext.createGain();
@@ -698,7 +698,7 @@ class AudioIO {
         this.processorNode.connect(silentGain);
         silentGain.connect(this.audioContext.destination);
 
-        console.log('✅ ScriptProcessor 链路已建立 (静音连接，仅用于触发回调)');
+        console.log(' ScriptProcessor 链路已建立 (静音连接，仅用于触发回调)');
     }
 
     /**

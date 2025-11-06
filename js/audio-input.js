@@ -2,7 +2,7 @@
  * 音频输入模块
  * 负责管理麦克风输入、AudioContext创建和音频流处理
  *
- * Phase 1 改进:
+ * 改进:
  * - 使用集中配置 (audio-config.js)
  * - 增强启动日志与错误提示
  * - 为 AudioWorklet 迁移做准备
@@ -23,14 +23,14 @@ class AudioInputManager {
         // 音频处理回调
         this.onAudioProcess = null;
 
-        // 配置参数 (Phase 1: 从 audio-config.js 读取)
+        // 配置参数 ( 从 audio-config.js 读取)
         // 当前保持兼容，使用内联配置
         this.config = {
-            bufferSize: 2048,  // Phase 1 后期将降至 128-256
+            bufferSize: 2048,  // 后期将降至 128-256
             sampleRate: 44100, // 与 Dubler 2 一致
             fftSize: 2048,
             smoothingTimeConstant: 0,
-            useWorklet: false  // Phase 1 Feature Flag (暂时禁用)
+            useWorklet: false  // Feature Flag (暂时禁用)
         };
 
         // 性能追踪
@@ -77,15 +77,15 @@ class AudioInputManager {
         this.startTime = performance.now();
 
         try {
-            console.group('🎵 [AudioInput] 初始化音频系统');
+            console.group(' [AudioInput] 初始化音频系统');
 
             // 检查浏览器支持
             const support = this.checkBrowserSupport();
             if (!support.isSupported) {
-                console.error('❌ 浏览器兼容性检查失败:', support.issues);
+                console.error(' 浏览器兼容性检查失败:', support.issues);
                 throw new Error('浏览器不支持:\n' + support.issues.join('\n'));
             }
-            console.log('✅ 浏览器兼容性: 通过');
+            console.log(' 浏览器兼容性: 通过');
 
             // 创建AudioContext，优化低延迟
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -101,7 +101,7 @@ class AudioInputManager {
                 (this.audioContext.outputLatency * 1000).toFixed(2) : 'N/A';
             const bufferLatency = ((this.config.bufferSize / this.audioContext.sampleRate) * 1000).toFixed(2);
 
-            console.log('📊 AudioContext 配置:');
+            console.log(' AudioContext 配置:');
             console.log('  • 采样率:', this.audioContext.sampleRate, 'Hz');
             console.log('  • 缓冲大小:', this.config.bufferSize, 'samples');
             console.log('  • 缓冲延迟:', bufferLatency, 'ms');
@@ -110,21 +110,21 @@ class AudioInputManager {
             console.log('  • 延迟模式:', 'interactive');
             console.log('  • AudioWorklet:', this.config.useWorklet ? '启用' : '禁用 (使用 ScriptProcessor)');
 
-            // 检查 AudioWorklet 支持 (Phase 1 准备)
+            // 检查 AudioWorklet 支持 (准备)
             const hasWorklet = 'audioWorklet' in this.audioContext;
             if (hasWorklet) {
-                console.log('✅ AudioWorklet: 浏览器支持 (Phase 1 将启用)');
+                console.log(' AudioWorklet: 浏览器支持 (将启用)');
             } else {
-                console.warn('⚠️  AudioWorklet: 浏览器不支持 (将回退到 ScriptProcessor)');
+                console.warn('  AudioWorklet: 浏览器不支持 (将回退到 ScriptProcessor)');
             }
 
             this.initTime = performance.now() - this.startTime;
-            console.log(`⏱️  初始化耗时: ${this.initTime.toFixed(2)} ms`);
+            console.log(`⏱  初始化耗时: ${this.initTime.toFixed(2)} ms`);
             console.groupEnd();
 
             return true;
         } catch (error) {
-            console.error('❌ [AudioInput] 初始化失败:', error);
+            console.error(' [AudioInput] 初始化失败:', error);
             console.groupEnd();
             throw error;
         }
@@ -156,7 +156,7 @@ class AudioInputManager {
                 },
                 video: false
             });
-            console.log('✅ 麦克风权限已授予');
+            console.log(' 麦克风权限已授予');
 
             // 获取音频轨道信息
             const audioTrack = this.stream.getAudioTracks()[0];
@@ -177,20 +177,20 @@ class AudioInputManager {
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = this.config.fftSize;
             this.analyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
-            console.log('📊 创建分析器节点 (FFT:', this.config.fftSize + ')');
+            console.log(' 创建分析器节点 (FFT:', this.config.fftSize + ')');
 
             // 创建脚本处理器（实时音频处理）
-            // Phase 1: 当前使用 ScriptProcessor，后续将迁移到 AudioWorklet
+            //  当前使用 ScriptProcessor，后续将迁移到 AudioWorklet
             this.scriptProcessor = this.audioContext.createScriptProcessor(
                 this.config.bufferSize,
                 1, // 单声道输入
                 1  // 单声道输出
             );
-            console.log('⚙️  创建 ScriptProcessor (buffer:', this.config.bufferSize + ')');
-            console.warn('⚠️  ScriptProcessor 已废弃，Phase 1 将迁移到 AudioWorklet');
+            console.log('⚙  创建 ScriptProcessor (buffer:', this.config.bufferSize + ')');
+            console.warn('  ScriptProcessor 已废弃，将迁移到 AudioWorklet');
 
             // 连接音频节点链
-            // Phase 2.10: 仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
+            //  仅用于音频分析，不连接到 destination (避免直接回放麦克风输入)
             // 合成器会单独连接到 destination 输出音色
             this.microphone.connect(this.analyser);
             this.analyser.connect(this.scriptProcessor);
@@ -209,13 +209,13 @@ class AudioInputManager {
             this.isRunning = true;
 
             const micInitTime = performance.now() - micStartTime;
-            console.log(`✅ 麦克风启动成功 (耗时: ${micInitTime.toFixed(2)} ms)`);
+            console.log(` 麦克风启动成功 (耗时: ${micInitTime.toFixed(2)} ms)`);
             console.groupEnd();
 
             return true;
 
         } catch (error) {
-            console.error('❌ [AudioInput] 麦克风启动失败:', error);
+            console.error(' [AudioInput] 麦克风启动失败:', error);
             console.groupEnd();
 
             // 友好的错误提示
@@ -224,9 +224,9 @@ class AudioInputManager {
             } else if (error.name === 'NotFoundError') {
                 throw new Error('🎤 未找到麦克风设备\n\n请确保：\n• 麦克风已连接\n• 麦克风未被其他应用占用\n• 系统设置中麦克风已启用');
             } else if (error.name === 'NotReadableError') {
-                throw new Error('🔧 无法读取麦克风数据\n\n可能原因：\n• 麦克风被其他应用占用\n• 硬件故障\n• 驱动程序问题');
+                throw new Error(' 无法读取麦克风数据\n\n可能原因：\n• 麦克风被其他应用占用\n• 硬件故障\n• 驱动程序问题');
             } else {
-                throw new Error('❌ 无法启动麦克风: ' + error.message);
+                throw new Error(' 无法启动麦克风: ' + error.message);
             }
         }
     }

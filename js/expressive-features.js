@@ -3,7 +3,7 @@
  *
  * 统一入口，协调所有子模块（平滑、起音、频谱）来生成完整的 PitchFrame。
  *
- * Phase 2.6: 完整集成 SmoothingFilters、OnsetDetector、SpectralFeatures
+ *  完整集成 SmoothingFilters、OnsetDetector、SpectralFeatures
  *
  * @module expressive-features
  */
@@ -24,11 +24,11 @@ export class ExpressiveFeatures {
    * 构造函数
    *
    * @param {Object} [options={}] - 配置对象
-   * @param {AudioContext} [options.audioContext] - Web Audio API 上下文 (Phase 2.5 需要)
+   * @param {AudioContext} [options.audioContext] - Web Audio API 上下文 (需要)
    * @param {number} [options.sampleRate=44100] - 采样率
    * @param {number} [options.bufferSize=2048] - 缓冲区大小
    * @param {string} [options.mode='script-processor'] - 音频模式
-   * @param {Object} [options.config] - Phase 2.10: 集中式配置对象
+   * @param {Object} [options.config]: 集中式配置对象
    */
   constructor(options = {}) {
     this.audioContext = options.audioContext || null;
@@ -36,10 +36,10 @@ export class ExpressiveFeatures {
     this.bufferSize = options.bufferSize || 2048;
     this.mode = options.mode || 'script-processor';
 
-    // Phase 2.10: 使用集中式配置或回退到默认值
+    //  使用集中式配置或回退到默认值
     const appConfig = options.config;
 
-    // Phase 2.6: 初始化平滑滤波器
+    //  初始化平滑滤波器
     this.smoothingFilters = {
       // Kalman Filter 用于 cents 平滑 (高精度音高)
       cents: new KalmanFilter({
@@ -58,7 +58,7 @@ export class ExpressiveFeatures {
       })
     };
 
-    // Phase 2.6: 初始化起音检测器 (Phase 2.10: 完整参数映射)
+    //  初始化起音检测器 (Phase 2.10: 完整参数映射)
     this.onsetDetector = new OnsetDetector({
       sampleRate: this.sampleRate,
       energyThreshold: appConfig?.onset.energyThreshold ?? 6,
@@ -69,7 +69,7 @@ export class ExpressiveFeatures {
       debug: appConfig?.onset.debug ?? false
     });
 
-    // Phase 2.5: 初始化 SpectralFeatures (Phase 2.10: 完整参数映射)
+    //  初始化 SpectralFeatures (Phase 2.10: 完整参数映射)
     this.spectralFeatures = null;
     if (this.audioContext) {
       this.spectralFeatures = new SpectralFeatures({
@@ -91,11 +91,11 @@ export class ExpressiveFeatures {
       });
     }
 
-    // Phase 2.6: 音高稳定性计算 (滑动窗口)
+    //  音高稳定性计算 (滑动窗口)
     this.centsHistory = [];
     this.centsHistoryMaxLength = 10;  // 保存最近 10 帧的 cents 值
 
-    // Phase 2.6: attackTime 计算 (从 silence 到 peak 的时间)
+    //  attackTime 计算 (从 silence 到 peak 的时间)
     this.lastArticulationState = 'silence';
     this.attackStartTime = 0;
     this.currentAttackTime = 0;
@@ -105,7 +105,7 @@ export class ExpressiveFeatures {
       processCount: 0,
       totalProcessTime: 0,
       avgProcessTime: 0,
-      // Phase 2.6: 子模块性能统计 (累积值和平均值)
+      //  子模块性能统计 (累积值和平均值)
       smoothingTime: 0,        // 最后一帧耗时
       totalSmoothingTime: 0,   // 累积耗时
       avgSmoothingTime: 0,     // 平均耗时
@@ -117,13 +117,13 @@ export class ExpressiveFeatures {
       avgSpectralTime: 0
     };
 
-    console.log('[ExpressiveFeatures] 初始化 (Phase 2.10 - 集中式配置)');
+    console.log('[ExpressiveFeatures] 初始化 (- 集中式配置)');
     console.log(`  模式: ${this.mode}`);
     console.log(`  采样率: ${this.sampleRate} Hz`);
     console.log(`  缓冲区: ${this.bufferSize} 样本`);
-    console.log(`  AudioContext: ${this.audioContext ? '✅ 可用 (支持 AnalyserNode FFT)' : '❌ 未提供'}`);
-    console.log('  子模块: ✅ SmoothingFilters, ✅ OnsetDetector, ✅ SpectralFeatures');
-    console.log(`  配置来源: ${appConfig ? '✅ 集中式配置' : '⚠️ 回退默认值'}`);
+    console.log(`  AudioContext: ${this.audioContext ? ' 可用 (支持 AnalyserNode FFT)' : ' 未提供'}`);
+    console.log('  子模块:  SmoothingFilters,  OnsetDetector,  SpectralFeatures');
+    console.log(`  配置来源: ${appConfig ? ' 集中式配置' : ' 回退默认值'}`);
   }
 
   /**
@@ -171,7 +171,7 @@ export class ExpressiveFeatures {
       );
     }
 
-    // 4. Phase 2.6: 起音检测 ✅ (使用原始音量，避免平滑导致峰值钝化)
+    // 4.  起音检测  (使用原始音量，避免平滑导致峰值钝化)
     const onsetStart = performance.now();
     const currentState = this.onsetDetector.update(rawVolumeDb, timestamp);
     frame.articulation = currentState;
@@ -192,7 +192,7 @@ export class ExpressiveFeatures {
     this.stats.onsetTime = performance.now() - onsetStart;
     this.stats.totalOnsetTime += this.stats.onsetTime;
 
-    // 5. Phase 2.6: 平滑处理 ✅ (OnsetDetector 之后再平滑，保证检测灵敏度)
+    // 5.  平滑处理  (OnsetDetector 之后再平滑，保证检测灵敏度)
     const smoothStart = performance.now();
     frame.cents = this.smoothingFilters.cents.update(rawCents);
     frame.volumeDb = this.smoothingFilters.volumeDb.update(rawVolumeDb);  // 平滑原始值
@@ -201,7 +201,7 @@ export class ExpressiveFeatures {
     this.stats.smoothingTime = performance.now() - smoothStart;
     this.stats.totalSmoothingTime += this.stats.smoothingTime;
 
-    // 5. Phase 2.6: 频域特征提取 ✅
+    // 5.  频域特征提取 
     const spectralStart = performance.now();
     if (this.spectralFeatures) {
       try {
@@ -233,7 +233,7 @@ export class ExpressiveFeatures {
     this.stats.spectralTime = performance.now() - spectralStart;
     this.stats.totalSpectralTime += this.stats.spectralTime;
 
-    // 6. Phase 2.6: 音高稳定性计算 ✅
+    // 6.  音高稳定性计算 
     // 仅在置信度足够时记录 cents 值，避免静音时零值污染
     if (pitchInfo.frequency > 0 && pitchInfo.confidence > 0.5) {
       this.centsHistory.push(rawCents);
@@ -285,23 +285,23 @@ export class ExpressiveFeatures {
   reset() {
     console.log('[ExpressiveFeatures] 重置状态');
 
-    // Phase 2.6: 重置平滑滤波器
+    //  重置平滑滤波器
     this.smoothingFilters.cents.reset();
     this.smoothingFilters.volumeDb.reset();
     this.smoothingFilters.brightness.reset();
 
-    // Phase 2.6: 重置起音检测器
+    //  重置起音检测器
     this.onsetDetector.reset();
 
-    // Phase 2.5: 重置 SpectralFeatures
+    //  重置 SpectralFeatures
     if (this.spectralFeatures) {
       this.spectralFeatures.reset();
     }
 
-    // Phase 2.6: 重置音高稳定性历史
+    //  重置音高稳定性历史
     this.centsHistory = [];
 
-    // Phase 2.6: 重置 attackTime 相关状态
+    //  重置 attackTime 相关状态
     this.lastArticulationState = 'silence';
     this.attackStartTime = 0;
     this.currentAttackTime = 0;
@@ -325,15 +325,15 @@ export class ExpressiveFeatures {
   getStats() {
     const stats = { ...this.stats };
 
-    // Phase 2.6: 添加起音检测器统计
+    //  添加起音检测器统计
     stats.onsetDetector = this.onsetDetector.getStats();
 
-    // Phase 2.5: 添加 SpectralFeatures 统计
+    //  添加 SpectralFeatures 统计
     if (this.spectralFeatures) {
       stats.spectralFeatures = this.spectralFeatures.getStats();
     }
 
-    // Phase 2.6: 添加音高稳定性统计
+    //  添加音高稳定性统计
     stats.centsHistoryLength = this.centsHistory.length;
 
     return stats;

@@ -11,6 +11,8 @@
 import configManager from './config/app-config.js';
 import { checkBrowserSupport, calculateRMS } from './utils/audio-utils.js';
 import { AppContainer } from './core/app-container.js';
+import { ExpressiveFeatures } from './expressive-features.js';
+import instrumentPresetManager from './config/instrument-presets.js';
 
 class KazooApp {
     /**
@@ -747,13 +749,13 @@ container.register('config', (c) => {
     singleton: true
 });
 
-// 3. 乐器预设管理器 (独立服务，从全局加载)
-container.register('instrumentPresetManager', () => window.instrumentPresetManager, {
+// 3. 乐器预设管理器 (Phase 3 Stage2: 直接使用 import)
+container.register('instrumentPresetManager', () => instrumentPresetManager, {
     singleton: true
 });
 
-// 4. 表现力特征提取模块 (从全局加载)
-container.register('ExpressiveFeatures', () => window.ExpressiveFeatures, {
+// 4. 表现力特征提取模块 (Phase 3 Stage2: 直接使用 import)
+container.register('ExpressiveFeatures', () => ExpressiveFeatures, {
     singleton: true
 });
 

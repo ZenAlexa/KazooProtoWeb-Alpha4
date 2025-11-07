@@ -1,8 +1,8 @@
 # Kazoo Proto - Real-time Voice to Instrument
 
-**Version**: Alpha 6
-**Status**: Phase 1 Complete - Ultra-Low Latency Foundation
-**Last Updated**: October 30, 2025
+**Version**: 0.3.0 (Performance First)
+**Status**: Architecture complete, performance optimization in progress
+**Last Updated**: November 7, 2025
 
 Transform your voice into musical instruments in real-time with ultra-low latency audio processing.
 
@@ -14,15 +14,15 @@ Transform your voice into musical instruments in real-time with ultra-low latenc
 - **🎛️ Dual Pitch Tracking Modes** - Smooth continuous tracking or precise note-based detection
 - **🎵 Real-time Pitch Detection** - YIN algorithm running in AudioWorklet (low-latency thread)
 - **🎷 6 Instruments** - Saxophone, Violin, Piano, Flute, Guitar, Synth
-- **⚡ Ultra-Low Latency** - **8-15ms** end-to-end (Phase 1 breakthrough: -75% improvement)
+- **⚡ Low Latency** - Currently ~180ms, targeting <50ms (v0.3.0 optimization in progress)
 - **🚀 Zero Setup** - No calibration required, works instantly
 - **🌐 Browser-Based** - 100% client-side, no server needed
 
-### Phase 1 Achievement (Alpha 6)
-✅ **AudioWorklet Integration** - Modern audio processing in separate thread
-✅ **Latency Breakthrough** - 46-60ms → **8-15ms** (-75%)
-✅ **Non-blocking Architecture** - Main thread freed, UI stays responsive
-✅ **Automatic Fallback** - Graceful degradation to ScriptProcessor if needed
+### v0.3.0 Status (Performance First)
+✅ **Architecture Complete** - Dependency injection, modular design, clean code structure
+✅ **Real Latency Measurement** - `getLatencyStats()` for accurate profiling
+⚠️ **Performance Optimization** - Latency 180ms → targeting 80ms in this release
+⏳ **Test Coverage** - Expanding from 5% to 15%+ with real tests
 
 ### Audio Modes
 - **🌊 Continuous Mode (Default)**: Smooth frequency tracking - perfect for expressive slides, vibrato, and theremin-like playing
@@ -78,7 +78,7 @@ npm start
 
 ## 🏗️ Technical Architecture
 
-### Audio Pipeline (Phase 1 - Alpha 6)
+### Audio Pipeline (v0.3.0)
 ```
 Microphone Input
   ↓
@@ -101,7 +101,7 @@ Tone.js Audio Synthesis
   ↓
 Audio Output (< 8ms output latency)
 
-Total Latency: 8-15ms ✅
+Total Latency: ~180ms (optimization in progress for v0.3.0)
 ```
 
 ### Technology Stack
@@ -172,15 +172,14 @@ this.frequencyUpdateThreshold = 0.005; // 0.5% frequency change required
 
 ## 📊 Performance
 
-### Alpha 6 Metrics (Phase 1 Complete)
-| Metric | Alpha 5 (Old) | Alpha 6 (New) | Improvement |
-|--------|---------------|---------------|-------------|
-| **Processing** | ScriptProcessor | AudioWorklet | Modern API ✅ |
-| **Buffer Size** | 2048 samples | 128 samples | -93.75% |
-| **Buffer Latency** | 46.4ms | 2.9ms | -93.75% |
-| **Total Latency** | 46-60ms | **8-15ms** | **-75%** ✅ |
-| **Thread** | Main (blocking) | Audio thread | Non-blocking ✅ |
-| **CPU Usage** | ~10-15% | ~5-8% | -50% |
+### v0.3.0 Current Metrics
+| Metric | Status | Target | Note |
+|--------|--------|--------|------|
+| **Processing** | AudioWorklet | ✅ | Modern API with ScriptProcessor fallback |
+| **Architecture** | DI Container | ✅ | Clean dependency injection |
+| **Total Latency** | ~180ms | **<90ms** | v0.3.0 optimization goal |
+| **Test Coverage** | ~5% | >15% | Real tests with Vitest |
+| **Code Quality** | Good | ✅ | Modular, documented, maintainable |
 
 ### Browser Compatibility
 | Browser | AudioWorklet | Fallback Mode | Status |
@@ -311,29 +310,34 @@ Upload all files to:
 
 ## 🛣️ Development Roadmap
 
-### ✅ Phase 1: Ultra-Low Latency Foundation (Complete)
-- AudioWorklet integration
+### ✅ v0.1.x - v0.2.x: Architecture & Foundation (Complete)
+- AudioWorklet integration with ScriptProcessor fallback
 - YIN algorithm in audio thread
-- 8-15ms latency achievement
-- Dual-mode audio I/O
+- Dependency injection container
+- Dual-mode synthesizers (Continuous + Legacy)
+- Expression features (volume, brightness, breathiness)
+- Config management system
 
-### 🎯 Phase 2: Expression Mapping (Next)
-- Cents → Vibrato/Modulation
-- Formant → Brightness
-- Onset detection
-- Kalman/EMA smoothing
+### 🎯 v0.3.0: Performance First (In Progress)
+- **Latency optimization**: 180ms → <90ms
+- **Real measurement tools**: `getLatencyStats()` profiling
+- **Test coverage**: 5% → 15%+
+- **Code quality**: Reduce console.log statements
+- **Bottleneck identification**: FFT, Features, Synth analysis
 
-### 📅 Phase 3: Sound Quality
-- Sample-based synthesis
-- Multi-velocity layers
-- Professional effects chain
+### 📅 v0.4.0: User Experience
+- UI/UX refinements
+- Better error messages
+- Performance indicators
+- Improved visual feedback
 
-### 📅 Phase 4: UI/UX Overhaul
-- Voice calibration wizard
-- Real-time quality indicators
-- Performance mode
+### 📅 v1.0.0: Production Ready
+- Latency <50ms consistently
+- 40%+ test coverage
+- Professional documentation
+- Commercial quality audio
 
-**Target**: Dubler 2 feature parity (commercial quality)
+**Philosophy**: Working code > Perfect architecture. Performance > Features.
 
 ---
 
@@ -365,16 +369,16 @@ SOFTWARE.
 
 ## 🤝 Contributing
 
-Contributions welcome! Please read the roadmap and Phase 1 completion report before submitting PRs.
+Contributions welcome! Please read [PROJECT_STATUS.md](PROJECT_STATUS.md) and [CLAUDE.md](CLAUDE.md) before submitting PRs.
 
 ---
 
 ## 📧 Contact
 
 **Author**: Ziming Wang
-**Project**: Kazoo Proto Web Alpha 4
-**Version**: Alpha 6 (Phase 1 Complete)
-**Date**: October 30, 2025
+**Project**: Kazoo Proto Web
+**Version**: 0.3.0 (Performance First)
+**Date**: November 7, 2025
 
 ---
 

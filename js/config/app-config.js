@@ -9,7 +9,7 @@
  * - Documentation (完整文档化)
  *
  * @module AppConfig
- * @version Alpha 4
+ * @version 0.3.0
  * @see {@link docs/CONFIGURATION.md} 完整配置文档
  */
 

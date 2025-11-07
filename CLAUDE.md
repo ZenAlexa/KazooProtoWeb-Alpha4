@@ -1,104 +1,219 @@
-# Kazoo Proto Web – AI Guardrails
+# CLAUDE.md
 
-## 核心约束（必须遵守）
-- **依赖注入**: 服务通过 `AppContainer`（[js/main.js](js/main.js)）注册 → 仅暴露 `window.app` 和 `window.container`
-- **配置来源**: 唯一使用 `configManager.load()`，扩展预设修改 [js/config/instrument-presets.js](js/config/instrument-presets.js)
-- **新服务**: 定义类 → 容器注册 → 通过 `container.get()` 访问
-- **UI 更新**: 通过 `UIManager` 事件驱动，禁止直接 DOM 操作
-- **测试**: 使用 Vitest，测试必须能失败
+This file provides guidance to Claude Code when working with this repository.
 
-## 快速验证
-```bash
-npm test          # 改动核心服务后
-npm start         # UI/音频手动冒烟测试
+## Project Overview
+
+Kazoo Proto Web is a real-time voice-to-instrument system using Web Audio API. Users sing/hum into their microphone, and the system detects pitch and expression features to drive virtual instruments in real-time.
+
+**Critical Goal**: End-to-end latency < 50ms (currently 180ms - 3.6x over target)
+
+### Current Architecture
 ```
+js/
+├── main.js                     # KazooApp - main application
+├── audio-io.js                 # Audio I/O abstraction (Worklet + ScriptProcessor)
+├── pitch-detector.js           # YIN algorithm wrapper
+├── pitch-worklet.js            # AudioWorklet processor (YIN + FFT)
+├── continuous-synth.js         # Continuous mode synthesizer
+├── synthesizer.js              # Legacy synthesizer
+├── performance.js              # Performance monitoring
+├── expressive-features.js      # Feature extraction pipeline
+├── core/
+│   └── app-container.js        # Dependency injection container
+├── managers/
+│   └── ui-manager.js           # UI state management (event-driven)
+├── config/
+│   ├── app-config.js           # Centralized configuration
+│   └── instrument-presets.js   # Instrument definitions
+├── features/
+│   ├── onset-detector.js       # Attack detection
+│   ├── smoothing-filters.js    # Kalman + EMA filters
+│   └── spectral-features.js    # FFT-based feature extraction
+└── utils/
+    ├── audio-utils.js          # Audio processing utilities
+    └── logger.js               # Logging utility
 
-## 文档规则（2025-11-06 清理后制定）
+tests/
+├── unit/
+│   └── app-container.test.js   # 19 tests (DI container)
+└── config-system.test.js       # Config validation tests
 
-### 根目录文档（仅3个）
-1. **README.md** - 用户指南
-   - 用途：快速开始、功能说明
-   - 更新时机：新功能、API 变化
-   - 长度：< 300 行
-   - 禁止：技术细节、历史记录
-
-2. **PROJECT_STATUS.md** - 项目状态
-   - 用途：当前状态、关键问题、下一步
-   - 更新时机：每次重大改动后
-   - 长度：< 250 行
-   - 内容：当前状态、已知问题（P0/P1/P2）、命令、文件结构
-   - 禁止：详细历史、阶段报告、自我表扬
-
-3. **CLAUDE.md** - 本文件
-   - 用途：AI 开发守护规则
-   - 更新时机：核心约束变化、文档规则变化
-   - 长度：< 150 行
-   - 禁止：工作流细节、示例代码
-
-### docs/ 目录结构
-```
 docs/
 ├── guides/
-│   ├── troubleshooting.md    # 问题排查（常见错误）
-│   └── configuration.md       # 配置说明（核心配置项）
-├── CLEANUP_PLAN.md            # 优化清单（仅保留当前版本）
-└── CLEANUP_SUMMARY.md         # 清理总结（执行记录）
+│   ├── troubleshooting.md      # Common issues
+│   └── configuration.md        # Config reference
+├── CLEANUP_PLAN.md             # Optimization roadmap
+└── CLEANUP_SUMMARY.md          # What was deleted and why
 ```
 
-### 新文档放置规则
-- **操作指南** → `docs/guides/` （troubleshooting、configuration 等）
-- **清理/优化计划** → `docs/` 根目录（CLEANUP_*.md）
-- **临时分析报告** → 完成后删除，不提交
-- **阶段总结/完成报告** → 禁止创建
+### Audio Pipeline
+```
+Microphone → AudioWorklet → YIN Detection → Feature Extraction → Synthesizer → Output
+             (128 samples)    (pitch, clarity)  (volume, timbre)   (Tone.js)
+```
 
-### 严格禁止
-- ❌ 创建 `docs/phase*/`、`docs/step*/` 目录
-- ❌ 写"完成报告"、"阶段总结"（代码和 commit 已说明）
-- ❌ 写"执行计划"超过 200 行（简洁 or 不写）
-- ❌ 在文档中使用 emoji（代码日志可以用）
-- ❌ 预设测试结果（"🎉 所有测试通过"）
+## Common Development Commands
 
-### 文档更新原则
-1. **能不写就不写** - 代码即文档
-2. **写了就保持最新** - 过时文档比没有更糟
-3. **README 优先** - 用户关心的放 README
-4. **PROJECT_STATUS 其次** - 开发者关心的放这里
-5. **长期计划 → issue** - 不要写在文档里
+```bash
+# Development
+npm start                       # Start dev server (http://localhost:3000)
+npm test                        # Run tests (Vitest)
+npm run test:watch              # Run tests in watch mode
+npm run test:coverage           # Run tests with coverage
 
-## 触发条件：何时读文档
-- **快速开始** → [README.md](README.md)
-- **当前状态/已知问题** → [PROJECT_STATUS.md](PROJECT_STATUS.md)
-- **问题排查** → [docs/guides/troubleshooting.md](docs/guides/troubleshooting.md)
-- **配置修改** → [docs/guides/configuration.md](docs/guides/configuration.md)
-- **优化清单** → [docs/CLEANUP_PLAN.md](docs/CLEANUP_PLAN.md)
+# Debugging (in browser console after starting audio)
+window.app.getLatencyStats()    # Get latency measurements (min/max/avg/p50/p95)
+window.container.get('audioIO').mode  # Check mode ('worklet' or 'script-processor')
+window.container.getServiceNames()    # List all registered services
+```
 
-## 工作流最佳实践
-- 使用 `/catchup` 而非 `/compact`（新会话时读取分支改动）
-- 提交聚焦：一个 commit 做一件事
-- 困惑时简化代码，而非写文档
-- 删除代码胜过注释代码
-- 写能失败的测试，不写假测试
+## Core Constraints (Must Follow)
 
-## 测试规则
-- **工具**: Vitest only，禁止自制框架
-- **位置**: `tests/unit/` 或 `tests/integration/`
-- **命名**: `*.test.js`
-- **原则**: 测试必须能失败，禁止预设成功输出
-- **覆盖**: 核心模块优先，不追求数字
+1. **Dependency Injection**: All services registered in AppContainer
+   - Access via: `window.container.get('serviceName')`
+   - Only expose: `window.app` and `window.container`
+   - No global singletons
 
-## 性能目标
-- **延迟**: < 50ms（当前 180ms，严重超标）
-- **测量**: `window.app.getLatencyStats()`
-- **优先级**: 性能 > 架构美学
-- **原则**: 先达标，再优化
+2. **Configuration**: Single source of truth
+   - Use: `configManager.load()`
+   - Extend presets in: `js/config/instrument-presets.js`
 
-## 代码规则
-- **全局变量**: 仅 `window.app` 和 `window.container`
-- **服务访问**: `window.container.get('serviceName')`
-- **console**: 仅 error/warn，删除 80% debug/info
-- **注释**: 说明为什么，不说明是什么
-- **emoji**: 仅用户可见日志，代码中禁止
+3. **UI Updates**: Event-driven only
+   - Use: `UIManager` events
+   - No direct DOM manipulation
+
+4. **Testing**: Vitest only
+   - Location: `tests/unit/` or `tests/integration/`
+   - Tests must be able to fail
+   - No custom test frameworks
+   - No predefined success messages
+
+## Performance Targets
+
+| Metric | Target | Current | Status |
+|--------|--------|---------|--------|
+| Latency | < 50ms | 180ms | ❌ 3.6x over |
+| Test Coverage | 40% | ~5% | ❌ Needs work |
+| Global Variables | 0 | 2 | ⚠️ Acceptable |
+| Console Logs | < 50 | 286 | ❌ Too many |
+
+**Priority**: Performance > Architecture > Documentation
+
+## Documentation Rules
+
+### Root Directory (3 files only)
+1. **README.md** - User guide (< 300 lines)
+2. **PROJECT_STATUS.md** - Current state (< 250 lines)
+3. **CLAUDE.md** - This file (< 200 lines)
+
+### docs/ Structure
+```
+docs/
+├── guides/           # How-to guides
+└── *.md             # Planning/cleanup docs
+```
+
+### Strict Prohibitions
+- ❌ Creating `docs/phase*/` or `docs/step*/` directories
+- ❌ Writing "completion reports" or "stage summaries"
+- ❌ Using emoji in documentation
+- ❌ Creating fake tests with predefined success
+- ❌ Execution plans > 200 lines
+
+### Update Principles
+1. Code > Docs - Only write if absolutely necessary
+2. README first - User-facing information
+3. PROJECT_STATUS second - Developer information
+4. Long-term plans → GitHub issues, not docs
+
+## Development Workflow Reminders
+
+### Before Making Changes
+- Run `npm test` to ensure baseline works
+- Check current latency: `window.app.getLatencyStats()`
+- Verify Worklet mode: `window.container.get('audioIO').mode`
+
+### After Making Changes
+- Run `npm test` to verify tests still pass
+- Test in browser with `npm start`
+- Measure latency impact with `getLatencyStats()`
+- Commit focused changes (one thing per commit)
+
+### Testing Best Practices
+- Always run `npm test` before committing
+- Write tests that can fail (never fake success)
+- Test real audio pipeline, not mocked data
+- Integration tests > unit tests for audio code
+
+## Common Pitfalls
+
+1. **AudioWorklet Fallback**
+   - System may fall back to ScriptProcessor (2048 buffer = 46ms base latency)
+   - Check mode before debugging latency issues
+   - Worklet requires HTTPS or localhost
+
+2. **Configuration Not Loading**
+   - Must call `configManager.load()` before accessing config
+   - Config is singleton, loaded once at startup
+   - Changes require page reload
+
+3. **Service Not Found**
+   - Service must be registered in AppContainer first
+   - Check: `window.container.has('serviceName')`
+   - See: `js/main.js` lines 735-843 for registrations
+
+4. **Latency Measurement**
+   - `performanceMonitor` measures processing time only
+   - `getLatencyStats()` measures end-to-end (capture → output)
+   - Need 100+ samples for accurate stats
+
+## Performance Optimization Guidelines
+
+### Likely Bottlenecks (in order)
+1. **ScriptProcessor Fallback** (2048 buffer = 46ms)
+   - Solution: Ensure Worklet mode is active
+   - Check: `window.container.get('audioIO').mode === 'worklet'`
+
+2. **FFT Computation** (SpectralFeatures)
+   - Solution: Reduce FFT size or interval
+   - Location: `js/features/spectral-features.js`
+
+3. **Expression Feature Extraction**
+   - Solution: Disable non-critical features
+   - Location: `js/expressive-features.js`
+
+4. **Tone.js Synthesizer**
+   - Solution: Reduce filter complexity
+   - Location: `js/continuous-synth.js`
+
+### Measurement Strategy
+```javascript
+// In browser console
+const stats = window.app.getLatencyStats()
+console.table(stats)
+// Look at p95 (95th percentile) for realistic worst-case
+```
+
+## Agent Interaction Guidelines
+
+- Use `/catchup` not `/compact` at session start
+- When debugging, read code implementation, not docs
+- Write tests that can fail, never fake tests
+- Delete code rather than comment it out
+- One commit per logical change
+
+## Important Instruction Reminders
+
+**Do what has been asked; nothing more, nothing less.**
+
+- NEVER create documentation files unless explicitly requested
+- ALWAYS prefer editing existing files over creating new ones
+- Focus on fixing latency (180ms → < 50ms) before architecture
+- Write real tests, not fake tests with predetermined results
+- Measure performance impact of every change
+- Code quality matters, but working code matters more
 
 ---
 
-**记住**: 这个项目目标是"能用"，不是"看起来专业"。少写文档，多修 bug。
+**Remember**: This project's goal is "working with low latency", not "looks professional". Fix bugs > Write docs.

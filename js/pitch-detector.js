@@ -182,6 +182,7 @@ class PitchDetector {
         // 这里我们主要基于音量来计算置信度
 
         if (!frequency || frequency <= 0) return 0;
+        if (!audioBuffer || audioBuffer.length === 0) return 0; // Handle empty buffer
 
         // 计算 RMS (均方根) 音量
         let sumSquares = 0;

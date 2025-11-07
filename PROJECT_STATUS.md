@@ -17,29 +17,43 @@ Real-time voice-to-instrument system using Web Audio API.
 - Expression mapping (volume, timbre, breathiness)
 
 ### Critical Issues
-- **Latency**: 180ms (target < 50ms) - 3.6x over goal
-- **Tests**: 1 real test suite, rest were fake
-- **Docs**: Still 192+ files after cleanup
+- **Latency**: 180ms (target < 50ms for v1.0, < 90ms for v0.3.0) - 3.6x over final goal
+- **Tests**: 67 passing (AppContainer + PitchDetector), coverage 10% (target 15% for v0.3.0)
+- **Docs**: Still 192+ files after cleanup (acceptable for now)
 
 ---
 
-## Recent Changes (2025-11-06)
+## v0.3.0 Progress (2025-11-07)
 
-### Cleanup Completed
-- Deleted 6 fake test files (custom framework, never ran)
-- Deleted 38 doc files (phase reports, stage summaries)
-- Deleted latency-profiler/ (monitoring without fixing)
-- Removed 150+ Phase X comments from code
-- Removed emoji from code comments
-- **Result**: -21,752 lines
+### ✅ Completed
+1. **Version unified to 0.3.0**
+   - Updated: package.json, README.md, CLAUDE.md, constants.js, app-config.js
+   - Removed "Phase X" terminology, using semantic versioning
 
-### Added
-- Real latency measurement: `window.app.getLatencyStats()`
-- Returns min/max/avg/p50/p95 from last 100 samples
+2. **Real unit tests added (48 new tests)**
+   - PitchDetector: 48 comprehensive tests
+   - AppContainer: 19 existing tests
+   - Total: 67 tests, 100% passing
+   - Test coverage: 5% → 10%
+   - Vitest CLI mode confirmed working
+
+3. **Bug fixes**
+   - PitchDetector: Empty buffer handling in calculateConfidence()
+   - Removed fake test: tests/config-system.test.js
+
+### 🔄 In Progress
+- AudioIO unit tests (next task)
+
+### 📋 Remaining Tasks (v0.3.0)
+- Reduce console.log statements (286 → 100)
+- Add timing instrumentation for profiling
+- Measure baseline latency (requires voice testing)
+- Verify AudioWorklet mode active
+- Profile and optimize latency bottlenecks (180ms → 80ms target)
 
 ### Architecture
 - Dependency injection via AppContainer
-- Global variables: 8 → 2 (window.app, window.container)
+- Global variables: 2 only (window.app, window.container)
 - Services accessed via: `window.container.get('serviceName')`
 
 ---

@@ -197,6 +197,21 @@ console.table(stats)
 // Look at p95 (95th percentile) for realistic worst-case
 ```
 
+## v0.3.0 Development Principles
+
+### Testing Philosophy
+- **Real tests only** - Every test must be able to fail
+- **Vitest CLI mode** - Use `npm test`, not UI mode (disconnected issue)
+- **No mocking unless necessary** - Test actual implementations when possible
+- **Coverage target** - 15% for v0.3.0 (currently 10%)
+- **Test file location** - `tests/unit/` for unit tests
+
+### Development Workflow
+- **No voice testing required** - Write tests, reduce console.log, add instrumentation first
+- **Voice testing tasks** - Saved for later (latency measurement, profiling, optimization)
+- **One feature per commit** - Clear, atomic commits with descriptive messages
+- **Run tests before commit** - `npm test` must pass
+
 ## Agent Interaction Guidelines
 
 - Use `/catchup` not `/compact` at session start
@@ -204,6 +219,7 @@ console.table(stats)
 - Write tests that can fail, never fake tests
 - Delete code rather than comment it out
 - One commit per logical change
+- Update PROJECT_STATUS.md when completing major tasks
 
 ## Important Instruction Reminders
 
